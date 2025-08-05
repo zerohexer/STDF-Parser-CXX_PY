@@ -1,13 +1,19 @@
 # Build artifacts
 build/
-*.pyd
-*.so
 *.o
 *.exe
 *.obj
 *.lib
 *.dll
 *.dylib
+
+# Python extensions (keep working binaries)
+# *.pyd
+# *.so
+
+# But exclude specific build artifacts
+build/**/*.pyd
+build/**/*.so
 
 # Python cache
 __pycache__/
