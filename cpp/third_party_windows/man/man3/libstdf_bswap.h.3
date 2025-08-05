@@ -1,0 +1,67 @@
+.TH "libstdf_bswap.h" 3 "13 Jul 2004" "libstdf" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+libstdf_bswap.h \- 
+.SH "Detailed Description"
+.PP 
+Byte swapping functions. 
+
+
+.PP
+.SH SYNOPSIS
+.br
+.PP
+.SS "Defines"
+
+.in +1c
+.ti -1c
+.RI "#define \fBstdf_bswap_16\fP(x)"
+.br
+.RI "\fISwap bytes in a 16 bit value. \fP"
+.ti -1c
+.RI "#define \fBstdf_bswap_32\fP(x)"
+.br
+.RI "\fISwap bytes in a 32 bit value. \fP"
+.ti -1c
+.RI "#define \fBstdf_bswap_64\fP(x)"
+.br
+.RI "\fISwap bytes in a 64 bit value. \fP"
+.in -1c
+.SH "Define Documentation"
+.PP 
+.SS "#define stdf_bswap_16(x)"
+.PP
+\fBValue:\fP.nf
+x = ((((x) & 0xff00) >> 8) | \
+         (((x) & 0x00ff) << 8))
+.fi
+Swap bytes in a 16 bit value. 
+.PP
+.SS "#define stdf_bswap_32(x)"
+.PP
+\fBValue:\fP.nf
+x = ((((x) & 0xff000000) >> 24) | \
+         (((x) & 0x00ff0000) >>  8) | \
+         (((x) & 0x0000ff00) <<  8) | \
+         (((x) & 0x000000ff) << 24))
+.fi
+Swap bytes in a 32 bit value. 
+.PP
+.SS "#define stdf_bswap_64(x)"
+.PP
+\fBValue:\fP.nf
+x = ((((x) & 0xff00000000000000) >> 56) | \
+         (((x) & 0x00ff000000000000) >> 40) | \
+         (((x) & 0x0000ff0000000000) >> 24) | \
+         (((x) & 0x000000ff00000000) >>  8) | \
+         (((x) & 0x00000000ff000000) <<  8) | \
+         (((x) & 0x0000000000ff0000) << 24) | \
+         (((x) & 0x000000000000ff00) << 40) | \
+         (((x) & 0x00000000000000ff) << 56))
+.fi
+Swap bytes in a 64 bit value. 
+.PP
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libstdf from the source code.

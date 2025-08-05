@@ -1,0 +1,275 @@
+.TH "libstdf_types.h" 3 "13 Jul 2004" "libstdf" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+libstdf_types.h \- 
+.SH "Detailed Description"
+.PP 
+Public types. 
+
+
+.PP
+.SH SYNOPSIS
+.br
+.PP
+.SS "Data Structures"
+
+.in +1c
+.ti -1c
+.RI "struct \fBdtc_Vn_ele\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_header\fP"
+.br
+.RI "\fIThe header found with every record in a STDF file. \fP"
+.ti -1c
+.RI "struct \fBrec_unknown\fP"
+.br
+.RI "\fIThe basic record type. \fP"
+.ti -1c
+.RI "struct \fBrec_far\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_atr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_mir\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_mrr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_pcr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_hbr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_sbr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_pmr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_pgr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_plr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_rdr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_sdr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_wir\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_wrr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_wcr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_pir\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_prr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_tsr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_ptr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_mpr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_ftr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_bps\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_eps\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_gdr\fP"
+.br
+.ti -1c
+.RI "struct \fBrec_dtr\fP"
+.br
+.in -1c
+.SS "Defines"
+
+.in +1c
+.ti -1c
+.RI "#define \fBMAKE_REC\fP(typ, sub)   ((typ << 8) + sub)"
+.br
+.ti -1c
+.RI "#define \fBHEAD_TO_REC\fP(h)   MAKE_REC(h.REC_TYP,h.REC_SUB)"
+.br
+.ti -1c
+.RI "#define \fBREC_FAR\fP   MAKE_REC(REC_TYP_INFO, REC_SUB_FAR)"
+.br
+.ti -1c
+.RI "#define \fBREC_ATR\fP   MAKE_REC(REC_TYP_INFO, REC_SUB_ATR)"
+.br
+.ti -1c
+.RI "#define \fBREC_MIR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_MIR)"
+.br
+.ti -1c
+.RI "#define \fBREC_MRR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_MRR)"
+.br
+.ti -1c
+.RI "#define \fBREC_PCR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_PCR)"
+.br
+.ti -1c
+.RI "#define \fBREC_HBR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_HBR)"
+.br
+.ti -1c
+.RI "#define \fBREC_SBR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_SBR)"
+.br
+.ti -1c
+.RI "#define \fBREC_PMR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_PMR)"
+.br
+.ti -1c
+.RI "#define \fBREC_PGR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_PGR)"
+.br
+.ti -1c
+.RI "#define \fBREC_PLR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_PLR)"
+.br
+.ti -1c
+.RI "#define \fBREC_RDR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_RDR)"
+.br
+.ti -1c
+.RI "#define \fBREC_SDR\fP   MAKE_REC(REC_TYP_PER_LOT, REC_SUB_SDR)"
+.br
+.ti -1c
+.RI "#define \fBREC_WIR\fP   MAKE_REC(REC_TYP_PER_WAFER, REC_SUB_WIR)"
+.br
+.ti -1c
+.RI "#define \fBREC_WRR\fP   MAKE_REC(REC_TYP_PER_WAFER, REC_SUB_WRR)"
+.br
+.ti -1c
+.RI "#define \fBREC_WCR\fP   MAKE_REC(REC_TYP_PER_WAFER, REC_SUB_WCR)"
+.br
+.ti -1c
+.RI "#define \fBREC_PIR\fP   MAKE_REC(REC_TYP_PER_PART, REC_SUB_PIR)"
+.br
+.ti -1c
+.RI "#define \fBREC_PRR\fP   MAKE_REC(REC_TYP_PER_PART, REC_SUB_PRR)"
+.br
+.ti -1c
+.RI "#define \fBREC_TSR\fP   MAKE_REC(REC_TYP_PER_TEST, REC_SUB_TSR)"
+.br
+.ti -1c
+.RI "#define \fBREC_PTR\fP   MAKE_REC(REC_TYP_PER_EXEC, REC_SUB_PTR)"
+.br
+.ti -1c
+.RI "#define \fBREC_MPR\fP   MAKE_REC(REC_TYP_PER_EXEC, REC_SUB_MPR)"
+.br
+.ti -1c
+.RI "#define \fBREC_FTR\fP   MAKE_REC(REC_TYP_PER_EXEC, REC_SUB_FTR)"
+.br
+.ti -1c
+.RI "#define \fBREC_BPS\fP   MAKE_REC(REC_TYP_PER_PROG, REC_SUB_BPS)"
+.br
+.ti -1c
+.RI "#define \fBREC_EPS\fP   MAKE_REC(REC_TYP_PER_PROG, REC_SUB_EPS)"
+.br
+.ti -1c
+.RI "#define \fBREC_GDR\fP   MAKE_REC(REC_TYP_GENERIC, REC_SUB_GDR)"
+.br
+.ti -1c
+.RI "#define \fBREC_DTR\fP   MAKE_REC(REC_TYP_GENERIC, REC_SUB_DTR)"
+.br
+.ti -1c
+.RI "#define \fBREC_UNKNOWN\fP   MAKE_REC(REC_TYP_UNKNOWN, REC_SUB_UNKNOWN)"
+.br
+.in -1c
+.SS "Typedefs"
+
+.in +1c
+.ti -1c
+.RI "typedef uint8_t \fBbyte_t\fP"
+.br
+.ti -1c
+.RI "typedef char * \fBdtc_Cn\fP"
+.br
+.ti -1c
+.RI "typedef char \fBdtc_C1\fP"
+.br
+.ti -1c
+.RI "typedef uint8_t \fBdtc_U1\fP"
+.br
+.ti -1c
+.RI "typedef uint16_t \fBdtc_U2\fP"
+.br
+.ti -1c
+.RI "typedef uint32_t \fBdtc_U4\fP"
+.br
+.ti -1c
+.RI "typedef int8_t \fBdtc_I1\fP"
+.br
+.ti -1c
+.RI "typedef int16_t \fBdtc_I2\fP"
+.br
+.ti -1c
+.RI "typedef int32_t \fBdtc_I4\fP"
+.br
+.ti -1c
+.RI "typedef float \fBdtc_R4\fP"
+.br
+.ti -1c
+.RI "typedef double \fBdtc_R8\fP"
+.br
+.ti -1c
+.RI "typedef char * \fBdtc_Bn\fP"
+.br
+.ti -1c
+.RI "typedef char \fBdtc_B1\fP"
+.br
+.ti -1c
+.RI "typedef char * \fBdtc_Dn\fP"
+.br
+.ti -1c
+.RI "typedef char \fBdtc_N1\fP"
+.br
+.ti -1c
+.RI "typedef dtc_Cn * \fBdtc_xCn\fP"
+.br
+.ti -1c
+.RI "typedef dtc_U1 * \fBdtc_xU1\fP"
+.br
+.ti -1c
+.RI "typedef dtc_U2 * \fBdtc_xU2\fP"
+.br
+.ti -1c
+.RI "typedef dtc_R4 * \fBdtc_xR4\fP"
+.br
+.ti -1c
+.RI "typedef dtc_N1 * \fBdtc_xN1\fP"
+.br
+.ti -1c
+.RI "typedef dtc_Vn_ele * \fBdtc_Vn\fP"
+.br
+.in -1c
+.SS "Enumerations"
+
+.in +1c
+.ti -1c
+.RI "enum \fBrec_typ\fP { \fBREC_TYP_INFO\fP =  0, \fBREC_TYP_PER_LOT\fP =  1, \fBREC_TYP_PER_WAFER\fP =  2, \fBREC_TYP_PER_PART\fP =  5, \fBREC_TYP_PER_TEST\fP =  10, \fBREC_TYP_PER_EXEC\fP =  15, \fBREC_TYP_PER_PROG\fP =  20, \fBREC_TYP_PER_SITE\fP =  25, \fBREC_TYP_GENERIC\fP =  50, \fBREC_TYP_RESV_IMAGE\fP =  180, \fBREC_TYP_RESV_IG900\fP =  181, \fBREC_TYP_UNKNOWN\fP =  0xFF }"
+.br
+.ti -1c
+.RI "enum \fBrec_sub\fP { \fBREC_SUB_FAR\fP =  10, \fBREC_SUB_ATR\fP =  20, \fBREC_SUB_MIR\fP =  10, \fBREC_SUB_MRR\fP =  20, \fBREC_SUB_PCR\fP =  30, \fBREC_SUB_HBR\fP =  40, \fBREC_SUB_SBR\fP =  50, \fBREC_SUB_PMR\fP =  60, \fBREC_SUB_PGR\fP =  62, \fBREC_SUB_PLR\fP =  63, \fBREC_SUB_RDR\fP =  70, \fBREC_SUB_SDR\fP =  80, \fBREC_SUB_WIR\fP =  10, \fBREC_SUB_WRR\fP =  20, \fBREC_SUB_WCR\fP =  30, \fBREC_SUB_PIR\fP =  10, \fBREC_SUB_PRR\fP =  20, \fBREC_SUB_TSR\fP =  30, \fBREC_SUB_PTR\fP =  10, \fBREC_SUB_MPR\fP =  15, \fBREC_SUB_FTR\fP =  20, \fBREC_SUB_BPS\fP =  10, \fBREC_SUB_EPS\fP =  20, \fBREC_SUB_GDR\fP =  10, \fBREC_SUB_DTR\fP =  30, \fBREC_SUB_UNKNOWN\fP =  0xFF }"
+.br
+.ti -1c
+.RI "enum \fBrec_state\fP { \fBREC_STATE_RAW\fP, \fBREC_STATE_PARSED\fP }"
+.br
+.in -1c
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libstdf from the source code.

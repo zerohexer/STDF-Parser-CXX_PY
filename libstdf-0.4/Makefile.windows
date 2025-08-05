@@ -1,0 +1,33 @@
+
+# Simple Windows Makefile for libstdf
+CC = gcc
+CXX = g++
+AR = ar
+CFLAGS = -O2 -Wall -DWIN32 -D_WINDOWS -DNDEBUG
+CXXFLAGS = $(CFLAGS) -std=c++14
+
+# Source files
+SOURCES = src/libstdf.c src/dtc.c src/rec.c
+OBJECTS = $(SOURCES:.c=.o)
+
+# Target
+TARGET = libstdf.a
+
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(AR) rcs $@ $^
+
+%.o: %.c
+	$(CC) $(CFLAGS) -Iinclude -c $< -o $@
+
+clean:
+	rm -f $(OBJECTS) $(TARGET)
+
+install: $(TARGET)
+	mkdir -p ../cpp/third_party/lib
+	mkdir -p ../cpp/third_party/include
+	cp $(TARGET) ../cpp/third_party/lib/
+	cp include/*.h ../cpp/third_party/include/
+
+.PHONY: all clean install

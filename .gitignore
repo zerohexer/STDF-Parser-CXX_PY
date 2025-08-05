@@ -1,0 +1,37 @@
+# Build artifacts
+build/
+*.pyd
+*.so
+*.o
+*.exe
+*.obj
+*.lib
+*.dll
+*.dylib
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# repomix
+repomix*
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# STDF test files (optional - uncomment if you don't want to commit large test files)
+# STDF_Files/*.stdf

@@ -1,0 +1,72 @@
+{
+  "field_extraction_rules": {
+    "PTR": {
+      "enabled": true,
+      "fields": [
+        "TEST_NUM",
+        "HEAD_NUM",
+        "SITE_NUM",
+        "TEST_FLG",
+        "PARM_FLG",
+        "RESULT",
+        "ALARM_ID",
+        "LO_LIMIT",
+        "HI_LIMIT",
+        "UNITS"
+      ],
+      "description": "Parametric Test Record - Includes HEAD_NUM and SITE_NUM for proper field mapping"
+    },
+    "MPR": {
+      "enabled": true,
+      "fields": [
+        "TEST_NUM",
+        "HEAD_NUM", 
+        "SITE_NUM",
+        "TEST_FLG",
+        "PARM_FLG",
+        "RSLT_CNT",
+        "RSLT_TYP",
+        "RTN_STAT"
+      ],
+      "description": "Multiple-Result Parametric Record - Includes HEAD_NUM and SITE_NUM for proper field mapping"
+    },
+    "SBR": {
+      "enabled": false,
+      "fields": [
+        "HEAD_NUM",
+        "SITE_NUM",
+        "SBIN_NUM",
+        "SBIN_CNT"
+      ],
+      "description": "Software Bin Record - Dynamic addition demo"
+    },
+    "HBR": {
+      "enabled": false,
+      "fields": [],
+      "description": "Hardware Bin Record - Auto-extract ALL fields with guaranteed HEAD_NUM, SITE_NUM, HBIN_NUM mapping"
+    },
+    "FTR": {
+      "enabled": false,
+      "fields": [],
+      "description": "Functional Test Record - Auto-extract ALL fields with guaranteed TEST_NUM, HEAD_NUM, SITE_NUM mapping"
+    }
+  },
+  "global_settings": {
+    "extract_all_if_no_config": false,
+    "include_context_fields": true,
+    "context_fields": [
+      "WLD_ID",
+      "WTP_ID",
+      "WPTM_CREATED_DATE",
+      "ALARM_ID"
+    ]
+  },
+  "version": "1.1",
+  "last_updated": "2025-07-31T11:47:12.309708",
+  "usage_notes": {
+    "auto_extract": "To auto-extract ALL fields from a record type, set 'enabled': true and 'fields': [] (empty array)",
+    "required_fields": "For auto-extract with guaranteed field mapping order, add 'required_fields': ['FIELD1', 'FIELD2'] - these fields will be mapped first in the specified order",
+    "specific_fields": "To extract only specific fields, list them in the 'fields' array",
+    "discovery": "Use the discover_available_fields() method to see all available fields for any record type"
+  }
+}

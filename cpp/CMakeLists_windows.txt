@@ -1,0 +1,91 @@
+cmake_minimum_required(VERSION 3.15)
+project(STDFParserCpp)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Windows and Clang specific settings
+if(WIN32)
+    set(CMAKE_CXX_COMPILER "clang++")
+    set(CMAKE_C_COMPILER "clang")
+    
+    # Clang flags for Windows
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++14 /O2 /W3 /MD /EHsc")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /O2 /W3 /MD")
+    
+    # Windows definitions
+    add_definitions(-DWIN32 -D_WINDOWS -DNDEBUG)
+endif()
+
+# Find Python
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
+message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
+
+# Include directories
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/include
+    ${Python3_INCLUDE_DIRS}
+)
+
+# Library directories
+link_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lib
+    ${Python3_LIBRARY_DIRS}
+)
+
+# Source files
+set(SOURCES
+    src/stdf_parser.cpp
+)
+
+# Create static library for the STDF parser core
+add_library(stdf_parser_core STATIC ${SOURCES})
+
+# Python extension module
+add_library(stdf_parser_cpp MODULE
+    src/python_bridge.cpp
+    ${SOURCES}
+)
+
+# Set target properties for Windows
+set_target_properties(stdf_parser_cpp PROPERTIES
+    PREFIX ""
+    SUFFIX ".pyd"  # Python extension suffix on Windows
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../python
+)
+
+# Link libraries
+target_link_libraries(stdf_parser_cpp 
+    ${Python3_LIBRARIES}
+    # stdf  # Uncomment when libstdf is available
+)
+
+# Windows-specific linker flags
+if(WIN32)
+    set_target_properties(stdf_parser_cpp PROPERTIES
+        LINK_FLAGS "/SUBSYSTEM:WINDOWS /MACHINE:X64"
+    )
+endif()
+
+# Installation
+install(TARGETS stdf_parser_cpp 
+        LIBRARY DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../python
+        RUNTIME DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/../python)
+
+# Optional: Build standalone executable for testing
+add_executable(stdf_test
+    src/stdf_parser.cpp
+    # tests/test_main.cpp  # Create this file if needed
+)
+
+target_link_libraries(stdf_test
+    # stdf  # Uncomment when libstdf is available
+)
+
+# Print build information
+message(STATUS "Building for Windows with Clang")
+message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
+message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")

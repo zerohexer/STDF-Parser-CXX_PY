@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libstdf
+Description: STDF parsing library
+Requires: @requirements@
+Version: @VERSION@
+Libs: -L${libdir} -lstdf
+Cflags: -I${includedir}

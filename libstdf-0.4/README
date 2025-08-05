@@ -1,0 +1,8 @@
+HOMEPAGE:    http://freestdf.sourceforge.net/
+AUTHOR:      Mike Frysinger <vapier@gmail.com>
+
+--- About ---
+The FreeSTDF project is about providing open source (free) resources for 
+people out there who wish to manipulate the Standard Test Data Format 
+(STDF). STDF is just the beginning; other industry standards that lack 
+free resources could also be provided for someday :).

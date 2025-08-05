@@ -1,0 +1,89 @@
+.TH "libstdf.h" 3 "13 Jul 2004" "libstdf" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+libstdf.h \- 
+.SH "Detailed Description"
+.PP 
+Top level include and the main stdf structure definition. 
+
+
+.PP
+.SH SYNOPSIS
+.br
+.PP
+.SS "Data Structures"
+
+.in +1c
+.ti -1c
+.RI "struct \fB__stdf_fops\fP"
+.br
+.ti -1c
+.RI "struct \fBstdf_file\fP"
+.br
+.RI "\fIThe main STDF file structure. \fP"
+.in -1c
+.SS "Defines"
+
+.in +1c
+.ti -1c
+.RI "#define \fB__STDF_HOST_BYTE_ORDER\fP   BYTE_ORDER"
+.br
+.in -1c
+.SS "Enumerations"
+
+.in +1c
+.ti -1c
+.RI "enum \fBstdf_format\fP { \fBSTDF_FORMAT_REG\fP, \fBSTDF_FORMAT_ZIP\fP, \fBSTDF_FORMAT_GZIP\fP, \fBSTDF_FORMAT_BZIP2\fP }"
+.br
+.ti -1c
+.RI "enum \fBstdf_options\fP { \fBSTDF_OPTS_DEFAULT\fP =  0x00, \fBSTDF_OPTS_FORCE\fP =  0x01, \fBSTDF_OPTS_FORCE_V4\fP =  0x04, \fBSTDF_OPTS_ZIP\fP =  0x08, \fBSTDF_OPTS_GZIP\fP =  0x10, \fBSTDF_OPTS_BZIP2\fP =  0x20 }"
+.br
+.in -1c
+.SH "Enumeration Type Documentation"
+.PP 
+.SS "enum \fBstdf_format\fP"
+.PP
+Compressed file format 
+.PP
+\fBEnumeration values: \fP
+.in +1c
+.TP
+\fB\fISTDF_FORMAT_REG \fP\fP
+Regular file 
+.TP
+\fB\fISTDF_FORMAT_ZIP \fP\fP
+Zipped file 
+.TP
+\fB\fISTDF_FORMAT_GZIP \fP\fP
+gzipped file 
+.TP
+\fB\fISTDF_FORMAT_BZIP2 \fP\fP
+bzipped file 
+.SS "enum \fBstdf_options\fP"
+.PP
+Misc options to control libstdf behavior 
+.PP
+\fBEnumeration values: \fP
+.in +1c
+.TP
+\fB\fISTDF_OPTS_DEFAULT \fP\fP
+Default options 
+.TP
+\fB\fISTDF_OPTS_FORCE \fP\fP
+Force reading even if some sanity checks fail 
+.TP
+\fB\fISTDF_OPTS_FORCE_V4 \fP\fP
+Force STDFv4 behavior 
+.TP
+\fB\fISTDF_OPTS_ZIP \fP\fP
+File is compressed with zip 
+.TP
+\fB\fISTDF_OPTS_GZIP \fP\fP
+File is compressed with gzip 
+.TP
+\fB\fISTDF_OPTS_BZIP2 \fP\fP
+File is compressed with bzip2 
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libstdf from the source code.

@@ -1,0 +1,20 @@
+HOMEPAGE:    http://freestdf.sourceforge.net/
+AUTHOR:      Mike Frysinger <vapier@gmail.com>
+
+--- Compiling [*nix] ---
+If you downloaded a source tarball:
+(1) ./configure
+(2) make
+(3) sudo make install
+
+If you're using CVS:
+(1) nano test.sh (add/remove options for configure)
+(2) ./autogen.sh
+(3) sudo make install
+
+--- Compiling [win32] ---
+from the win32 directory, run:
+nmake -f libstdf.mak
+
+if you'd like to build the examples, just run:
+nmake -f libstdf.mak examples

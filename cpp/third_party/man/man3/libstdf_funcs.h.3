@@ -1,0 +1,115 @@
+.TH "libstdf_funcs.h" 3 "13 Jul 2004" "libstdf" \" -*- nroff -*-
+.ad l
+.nh
+.SH NAME
+libstdf_funcs.h \- 
+.SH "Detailed Description"
+.PP 
+Publicly exported functions. 
+
+
+.PP
+.SH SYNOPSIS
+.br
+.PP
+.SS "Defines"
+
+.in +1c
+.ti -1c
+.RI "#define \fBstdf_get_rec_name_from_head\fP(h)   stdf_get_rec_name(h.REC_TYP, h.REC_SUB)"
+.br
+.ti -1c
+.RI "#define \fBstdf_get_rec_name_from_rec\fP(r)   stdf_get_rec_name(r->header.REC_TYP, r->h.REC_SUB)"
+.br
+.in -1c
+.SS "Functions"
+
+.in +1c
+.ti -1c
+.RI "\fBstdf_file\fP * \fBstdf_open\fP (char *)"
+.br
+.ti -1c
+.RI "\fBstdf_file\fP * \fBstdf_open_ex\fP (char *, uint32_t)"
+.br
+.ti -1c
+.RI "int \fBstdf_close\fP (\fBstdf_file\fP *)"
+.br
+.ti -1c
+.RI "\fBrec_unknown\fP * \fBstdf_read_record\fP (\fBstdf_file\fP *)"
+.br
+.ti -1c
+.RI "\fBrec_unknown\fP * \fBstdf_read_record_raw\fP (\fBstdf_file\fP *)"
+.br
+.ti -1c
+.RI "\fBrec_unknown\fP * \fBstdf_parse_raw_record\fP (\fBrec_unknown\fP *)"
+.br
+.ti -1c
+.RI "void \fBstdf_free_record\fP (\fBrec_unknown\fP *)"
+.br
+.ti -1c
+.RI "char * \fBstdf_get_rec_name\fP (rec_typ, rec_sub)"
+.br
+.ti -1c
+.RI "char * \fBstdf_get_Vn_name\fP (int)"
+.br
+.in -1c
+.SH "Function Documentation"
+.PP 
+.SS "int stdf_close (\fBstdf_file\fP *)"
+.PP
+Close an open file 
+.PP
+\fBExamples: \fP
+.in +1c
+\fBdump_records_to_ascii.c\fP, \fBdump_records_to_html.c\fP, \fBexample.c\fP, \fBis_valid_stdf.c\fP, \fBrecord_stats.c\fP, and \fBstdf2xtdf.c\fP.
+.SS "void stdf_free_record (\fBrec_unknown\fP *)"
+.PP
+Free a record 
+.PP
+\fBExamples: \fP
+.in +1c
+\fBdump_records_to_ascii.c\fP, \fBdump_records_to_html.c\fP, \fBexample.c\fP, \fBis_valid_stdf.c\fP, \fBrecord_stats.c\fP, and \fBstdf2xtdf.c\fP.
+.SS "char* stdf_get_rec_name (rec_typ, rec_sub)"
+.PP
+Translate a record into the 3 letter spec name 
+.PP
+\fBExamples: \fP
+.in +1c
+\fBdump_records_to_ascii.c\fP, \fBis_valid_stdf.c\fP, \fBrecord_stats.c\fP, and \fBstdf2xtdf.c\fP.
+.SS "char* stdf_get_Vn_name (int)"
+.PP
+Translate a Vn type into the 2 letter spec name 
+.PP
+\fBExamples: \fP
+.in +1c
+\fBdump_records_to_ascii.c\fP, and \fBstdf2xtdf.c\fP.
+.SS "\fBstdf_file\fP* stdf_open (char *)"
+.PP
+Open a file with default options 
+.PP
+\fBExamples: \fP
+.in +1c
+\fBdump_records_to_ascii.c\fP, \fBdump_records_to_html.c\fP, \fBexample.c\fP, \fBis_valid_stdf.c\fP, \fBrecord_stats.c\fP, and \fBstdf2xtdf.c\fP.
+.SS "\fBstdf_file\fP* stdf_open_ex (char *, uint32_t)"
+.PP
+Open a file with custom options 
+.SS "\fBrec_unknown\fP* stdf_parse_raw_record (\fBrec_unknown\fP *)"
+.PP
+Parse a previously read record 
+.SS "\fBrec_unknown\fP* stdf_read_record (\fBstdf_file\fP *)"
+.PP
+Read in the next record and parse it 
+.PP
+\fBExamples: \fP
+.in +1c
+\fBdump_records_to_ascii.c\fP, \fBexample.c\fP, \fBis_valid_stdf.c\fP, \fBrecord_stats.c\fP, and \fBstdf2xtdf.c\fP.
+.SS "\fBrec_unknown\fP* stdf_read_record_raw (\fBstdf_file\fP *)"
+.PP
+Read in the next record raw 
+.PP
+\fBExamples: \fP
+.in +1c
+\fBdump_records_to_html.c\fP.
+.SH "Author"
+.PP 
+Generated automatically by Doxygen for libstdf from the source code.

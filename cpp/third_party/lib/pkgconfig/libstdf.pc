@@ -1,0 +1,11 @@
+prefix=/mnt/c/Users/AdminPEN.AAn/PycharmProjects/STDFReader_CPP/libstdf-0.4/../cpp/third_party
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libstdf
+Description: STDF parsing library
+Requires: @requirements@
+Version: 0.4
+Libs: -L${libdir} -lstdf
+Cflags: -I${includedir}

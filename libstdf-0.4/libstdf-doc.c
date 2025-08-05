@@ -1,0 +1,73 @@
+/**
+ * @brief Library for manipulating STDF files.
+ **/
+
+/**
+@mainpage libstdf
+
+@version 0.4
+@author Mike Frysinger <vapier@gmail.com>
+@date July 2004
+
+
+
+@section intro Introduction
+
+libstdf is a library for manipulating STDF files.
+
+
+
+@section install Install
+
+Since libstdf currently uses the GNU autotools, the 
+process is simply:
+@verbatim
+$ ./configure
+$ make
+$ sudo make install
+@endverbatim
+
+
+
+@section example Example
+
+Here is a quick and dirty sample program that opens
+an stdf file and reads all the records:
+@code
+#include <libstdf.h>
+
+int main(int argc, char *argv[])
+{
+	stdf_file *stdf;
+	rec_unknown *rec;
+
+	if (argc != 2)
+		return -1;
+
+	stdf = stdf_open(argv[1]);
+	if (!stdf)
+		return -2;
+
+	while ((rec=stdf_read_record(stdf)) != NULL) {
+		// do stuff
+		stdf_free_record(rec);
+	}
+
+	stdf_close(stdf);
+
+	return 0;
+}
+@endcode
+
+Then to compile:
+@verbatim
+$ gcc -o example example.c -lstdf
+@endverbatim
+*/
+
+/** @example example.c Simple example program */
+/** @example dump_records_to_ascii.c Dump STDF files to human readable ASCII */
+/** @example dump_records_to_html.c Dump STDF files to a nice html page for comparing the raw binary with human readable ASCII */
+/** @example is_valid_stdf.c Checks to see whether the STDF files conform to their respective specs */
+/** @example record_stats.c Display summary information about the number of records found */
+/** @example stdf2xtdf.c Dump STDF files to the XTDF format */

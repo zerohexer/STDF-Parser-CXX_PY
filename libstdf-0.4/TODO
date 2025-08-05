@@ -1,0 +1,20 @@
+0.5:
+
+ - polish writing support
+
+ - publish a cleaned up spec file containing all the info i have for
+   STDFv[34] in html format and post to website
+
+ - clean up the custom STDF files i wrote and post to website along with
+   the output generated when run through the example apps
+
+unknown:
+
+ - read in data from the STDF files in larger chunks than just 1 record at 
+   a time ... since files can easily have 50000+ records, we could cut the 
+   # of filesystem reads down by more than a factor of 10 with buffers of 
+   512/1024/etc... bytes
+
+ - STDF 'lint' remover to 'shrink' STDF files ...
+   - check if PTR records repeat the entries for limits, test name, etc...
+     If so, then remove duplicate entries after the first occurence
