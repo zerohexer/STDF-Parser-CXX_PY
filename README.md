@@ -46,10 +46,19 @@ git clone https://github.com/zerohexer/STDF-Parser-CXX_PY.git
 cd STDF-Parser-CXX_PY
 
 # Build the extension
-LD_LIBRARY_PATH=$PWD/cpp/third_party/lib:$LD_LIBRARY_PATH python3 setup_universal.py build_ext --inplace
+LD_LIBRARY_PATH=$PWD/cpp/third_party/lib:$LD_LIBRARY_PATH python3 setup.py build_ext --inplace
+
+OR
+
+python3 setup.py build_ext --inplace
 
 # Test
-LD_LIBRARY_PATH=$PWD/cpp/third_party/lib:$LD_LIBRARY_PATH python3 test_universal.py
+LD_LIBRARY_PATH=$PWD/cpp/third_party/lib:$LD_LIBRARY_PATH python3 test_parser.py
+
+OR
+
+./run_test.sh
+
 ```
 
 ## Building from Source
