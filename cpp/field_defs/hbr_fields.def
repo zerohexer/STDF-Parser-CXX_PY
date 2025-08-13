@@ -1,0 +1,8 @@
+// HBR (Hardware Bin Record) Field Definitions
+// Format: FIELD(field_name, member_name)
+
+FIELD("HEAD_NUM", HEAD_NUM)
+FIELD("SITE_NUM", SITE_NUM)
+FIELD("HBIN_NUM", HBIN_NUM)
+FIELD("HBIN_CNT", HBIN_CNT)
+FIELD("HBIN_PF", HBIN_PF)

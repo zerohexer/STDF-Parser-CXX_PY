@@ -1,0 +1,19 @@
+// PTR (Parametric Test Record) Field Definitions
+// Format: FIELD(field_name, member_name)
+// This file is used by X-Macros to generate dynamic field extraction code
+
+// Basic fields (always available)
+FIELD("TEST_NUM", TEST_NUM)
+FIELD("HEAD_NUM", HEAD_NUM)  
+FIELD("SITE_NUM", SITE_NUM)
+FIELD("TEST_FLG", TEST_FLG)
+FIELD("PARM_FLG", PARM_FLG)
+FIELD("RESULT", RESULT)
+
+// Extended fields (may be available in libstdf PTR)
+FIELD("OPT_FLAG", OPT_FLAG)
+FIELD("RES_SCAL", RES_SCAL)
+FIELD("LLM_SCAL", LLM_SCAL)
+FIELD("HLM_SCAL", HLM_SCAL)
+FIELD("LO_LIMIT", LO_LIMIT)
+FIELD("HI_LIMIT", HI_LIMIT)

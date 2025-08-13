@@ -1,0 +1,10 @@
+// FTR (Functional Test Record) Field Definitions  
+// Format: FIELD(field_name, member_name)
+
+FIELD("TEST_NUM", TEST_NUM)
+FIELD("HEAD_NUM", HEAD_NUM)
+FIELD("SITE_NUM", SITE_NUM)
+FIELD("TEST_FLG", TEST_FLG)
+FIELD("OPT_FLAG", OPT_FLAG)
+FIELD("CYCL_CNT", CYCL_CNT)
+FIELD("NUM_FAIL", NUM_FAIL)

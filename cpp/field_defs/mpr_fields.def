@@ -1,0 +1,10 @@
+// MPR (Multiple-Result Parametric Record) Field Definitions
+// Format: FIELD(field_name, member_name)
+
+FIELD("TEST_NUM", TEST_NUM)
+FIELD("HEAD_NUM", HEAD_NUM)
+FIELD("SITE_NUM", SITE_NUM)
+FIELD("TEST_FLG", TEST_FLG)
+FIELD("PARM_FLG", PARM_FLG)
+FIELD("RTN_ICNT", RTN_ICNT)
+FIELD("RSLT_CNT", RSLT_CNT)
