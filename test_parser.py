@@ -18,20 +18,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'python'))
 # Now import the C++ extension
 try:
     import stdf_parser_cpp
-    print("✓ Extension loaded successfully")
+    print(" Extension loaded successfully")
     print(f"Version: {stdf_parser_cpp.get_version()}")
 except ImportError as e:
-    print(f"✗ Failed to load extension: {e}")
+    print(f" Failed to load extension: {e}")
     sys.exit(1)
 
 def test_with_file(filepath):
     """Test parsing a single STDF file"""
     if not os.path.exists(filepath):
-        print(f"✗ File not found: {filepath}")
+        print(f" File not found: {filepath}")
         return False
         
     try:
-        print(f"\n📁 Testing with: {os.path.basename(filepath)}")
+        print(f"\n Testing with: {os.path.basename(filepath)}")
         result = stdf_parser_cpp.parse_stdf_file(filepath)
         
         if isinstance(result, dict):
@@ -39,13 +39,13 @@ def test_with_file(filepath):
             total = result.get('total_records', 0)
             parsed = result.get('parsed_records', 0)
             
-            print(f"✓ Successfully parsed {len(records)} records")
+            print(f" Successfully parsed {len(records)} records")
             print(f"  Total records in file: {total}")
             print(f"  Records parsed: {parsed}")
             
             # Show first few records
             if records:
-                print("\n📋 Sample records:")
+                print("\n Sample records:")
                 for i, record in enumerate(records[:3]):
                     record_type = record.get('record_type', 'UNKNOWN')
                     test_num = record.get('test_num', 'N/A')
@@ -60,11 +60,11 @@ def test_with_file(filepath):
             
             return True
         else:
-            print(f"✗ Unexpected result type: {type(result)}")
+            print(f" Unexpected result type: {type(result)}")
             return False
             
     except Exception as e:
-        print(f"✗ Error parsing file: {e}")
+        print(f" Error parsing file: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -80,9 +80,9 @@ if __name__ == "__main__":
             success = test_with_file(test_file)
             
             if success:
-                print(f"\n🎉 Parser test completed successfully!")
+                print(f"\n Parser test completed successfully!")
             else:
-                print(f"\n❌ Parser test failed!")
+                print(f"\n Parser test failed!")
                 sys.exit(1)
         else:
             print("No .stdf files found in STDF_Files directory")
