@@ -5,7 +5,7 @@
 #define HAVE_ASSERT_H 1
 
 /* Define to 1 if you have the <byteswap.h> header file. */
-/* #undef HAVE_BYTESWAP_H */
+#define HAVE_BYTESWAP_H 1
 
 /* Has bzip2 support */
 /* #undef HAVE_BZIP2 */
@@ -20,7 +20,7 @@
 #define HAVE_CTYPE_H 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
-/* #undef HAVE_DLFCN_H */
+#define HAVE_DLFCN_H 1
 
 /* Define to 1 if you have the <dmalloc.h> header file. */
 /* #undef HAVE_DMALLOC_H */
@@ -32,7 +32,7 @@
 /* #undef HAVE_EFENCE_H */
 
 /* Define to 1 if you have the <endian.h> header file. */
-/* #undef HAVE_ENDIAN_H */
+#define HAVE_ENDIAN_H 1
 
 /* Define to 1 if you have the <errno.h> header file. */
 #define HAVE_ERRNO_H 1
@@ -41,7 +41,7 @@
 #define HAVE_FCNTL_H 1
 
 /* Define to 1 if you have the <features.h> header file. */
-/* #undef HAVE_FEATURES_H */
+#define HAVE_FEATURES_H 1
 
 /* Has gd support (used by example programs) */
 /* #undef HAVE_GDLIB */
@@ -53,7 +53,7 @@
 /* #undef HAVE_GLIB */
 
 /* Has gzip support */
-/* #undef HAVE_GZIP */
+#define HAVE_GZIP 1
 
 /* Define to 1 if you have the <hash.h> header file. */
 /* #undef HAVE_HASH_H */
@@ -128,7 +128,7 @@
 /* #undef HAVE_ZIP */
 
 /* Define to 1 if you have the <zlib.h> header file. */
-/* #undef HAVE_ZLIB_H */
+#define HAVE_ZLIB_H 1
 
 /* Name of package */
 #define PACKAGE "libstdf"
@@ -152,7 +152,7 @@
 #define STDC_HEADERS 1
 
 /* Force endian type to big */
-#define STDF_FORCE_ENDIAN 1234
+/* #undef STDF_FORCE_ENDIAN */
 
 /* Enable support for STDFv3 */
 /* #undef STDF_VER3 */

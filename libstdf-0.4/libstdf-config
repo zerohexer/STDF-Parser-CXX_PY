@@ -1,6 +1,6 @@
 #!/bin/sh
 
-prefix=/mnt/c/Users/AdminPEN.AAn/PycharmProjects/STDFReader_CPP/libstdf-0.4/../cpp/third_party_windows
+prefix=/mnt/c/Users/AdminPEN.AAn/PycharmProjects/STDFReader_CPP/libstdf-0.4/../cpp/third_party
 exec_prefix=${prefix}
 exec_prefix_set=no
 
