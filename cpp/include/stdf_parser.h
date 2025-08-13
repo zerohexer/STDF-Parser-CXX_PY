@@ -75,6 +75,7 @@ private:
     STDFRecord parse_mpr_record(void* mpr_rec);
     STDFRecord parse_ftr_record(void* ftr_rec);
     STDFRecord parse_hbr_record(void* hbr_rec);
+    STDFRecord parse_sbr_record(void* sbr_rec);
     STDFRecord parse_mir_record(void* mir_rec);
     STDFRecord parse_prr_record(void* prr_rec);
     

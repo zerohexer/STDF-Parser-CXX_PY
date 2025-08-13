@@ -20,7 +20,7 @@ def setup_platform_libraries():
         current_path = os.environ.get("LD_LIBRARY_PATH", "")
         if lib_dir not in current_path:
             os.environ["LD_LIBRARY_PATH"] = f"{lib_dir}:{current_path}" if current_path else lib_dir
-        print(f"🐧 Linux: Set library path to {lib_dir}")
+        print(f" Linux: Set library path to {lib_dir}")
         
     elif system == "windows":
         print("🪟 Windows: Using static linking (no DLL dependencies)")
@@ -28,7 +28,7 @@ def setup_platform_libraries():
         if os.path.exists(lib_dir) and hasattr(os, 'add_dll_directory'):
             try:
                 os.add_dll_directory(lib_dir)
-                print(f"📂 Added DLL directory: {lib_dir}")
+                print(f" Added DLL directory: {lib_dir}")
             except:
                 pass
 
@@ -44,7 +44,7 @@ def extract_measurements(records):
         record_type = record.get('record_type', 'UNKNOWN')
         record_types[record_type].append(record)
     
-    print(f"\n📊 Record Type Summary:")
+    print(f"\n Record Type Summary:")
     for rtype, recs in record_types.items():
         print(f"  {rtype}: {len(recs)} records")
     
@@ -68,16 +68,16 @@ def extract_measurements(records):
             'burn_tim': fields.get('BURN_TIM', ''),
             'cmod_cod': fields.get('CMOD_COD', '')
         }
-        print(f"\n🔍 MIR Data:")
+        print(f"\n MIR Data:")
         print(f"  Lot: {mir_data['lot_name']}")
         print(f"  Wafer: {mir_data['wafer_id']}")
         print(f"  Part Type: {mir_data['part_typ']}")
         print(f"  Job: {mir_data['job_nam']}")
         print(f"  Node: {mir_data['node_nam']}")
     
-    # Process PTR (Parametric Test Records) - like your Python parser
+    # Process PTR (Parametric Test Records)
     if 'PTR' in record_types:
-        print(f"\n📏 Processing {len(record_types['PTR'])} PTR records...")
+        print(f"\n Processing {len(record_types['PTR'])} PTR records...")
         for ptr in record_types['PTR']:
             fields = ptr.get('fields', {})
             
@@ -104,6 +104,8 @@ def extract_measurements(records):
                 'lo_spec': fields.get('LO_SPEC', ''),
                 'hi_spec': fields.get('HI_SPEC', '')
             }
+
+
             
             # Extract device info (similar to your Python parser)
             if measurement['test_txt']:
@@ -115,7 +117,7 @@ def extract_measurements(records):
     
     # Process MPR (Multiple-Result Parametric Records)
     if 'MPR' in record_types:
-        print(f"\n📊 Processing {len(record_types['MPR'])} MPR records...")
+        print(f"\n Processing {len(record_types['MPR'])} MPR records...")
         for mpr in record_types['MPR']:
             fields = mpr.get('fields', {})
             
@@ -151,7 +153,7 @@ def extract_measurements(records):
     
     # Process FTR (Functional Test Records)  
     if 'FTR' in record_types:
-        print(f"\n⚡ Processing {len(record_types['FTR'])} FTR records...")
+        print(f"\n Processing {len(record_types['FTR'])} FTR records...")
         for ftr in record_types['FTR']:
             fields = ftr.get('fields', {})
             
@@ -189,7 +191,7 @@ def extract_measurements(records):
     # Process PRR (Part Result Records) for device information
     prr_devices = []
     if 'PRR' in record_types:
-        print(f"\n🔧 Processing {len(record_types['PRR'])} PRR records...")
+        print(f"\n Processing {len(record_types['PRR'])} PRR records...")
         for prr in record_types['PRR']:
             fields = prr.get('fields', {})
             
@@ -230,20 +232,20 @@ def analyze_measurements(extracted_data):
     devices = extracted_data['devices']
     parameters = extracted_data['parameters']
     
-    print(f"\n📈 Measurement Analysis:")
+    print(f"\n Measurement Analysis:")
     print(f"  Total measurements: {len(measurements):,}")
     print(f"  Unique devices: {len(devices):,}")
     print(f"  Unique parameters: {len(parameters):,}")
     
     # Analyze by record type
     type_counts = Counter(m['record_type'] for m in measurements)
-    print(f"\n📊 Measurement Types:")
+    print(f"\n Measurement Types:")
     for mtype, count in type_counts.most_common():
         print(f"  {mtype}: {count:,} measurements")
     
     # Show parameter samples
     if parameters:
-        print(f"\n🔍 Sample Parameters:")
+        print(f"\n Sample Parameters:")
         for i, param in enumerate(parameters[:10]):
             print(f"  {i+1}. {param}")
         if len(parameters) > 10:
@@ -251,7 +253,7 @@ def analyze_measurements(extracted_data):
     
     # Show device samples
     if devices:
-        print(f"\n🔧 Sample Devices:")
+        print(f"\n Sample Devices:")
         for i, device in enumerate(devices[:5]):
             print(f"  {i+1}. {device}")
         if len(devices) > 5:
@@ -260,7 +262,7 @@ def analyze_measurements(extracted_data):
     # Analyze PRR devices
     prr_devices = extracted_data['prr_devices']
     if prr_devices:
-        print(f"\n🏭 Device Summary:")
+        print(f"\n Device Summary:")
         hard_bins = Counter(d['hard_bin'] for d in prr_devices if d['hard_bin'])
         soft_bins = Counter(d['soft_bin'] for d in prr_devices if d['soft_bin'])
         
@@ -277,35 +279,35 @@ def test_measurements():
     
     try:
         import stdf_parser_cpp
-        print("✅ Extension loaded successfully")
+        print(" Extension loaded successfully")
         print(f"Version: {stdf_parser_cpp.get_version()}")
         
     except ImportError as e:
-        print(f"❌ Failed to load extension: {e}")
+        print(f" Failed to load extension: {e}")
         return False
     
     # Test with STDF files
     stdf_dir = "STDF_Files"
     if not os.path.exists(stdf_dir):
-        print(f"⚠️  STDF_Files directory not found")
+        print(f"  STDF_Files directory not found")
         return True
     
     stdf_files = [f for f in os.listdir(stdf_dir) if f.endswith('.stdf')]
     if not stdf_files:
-        print("⚠️  No .stdf files found in STDF_Files directory")
+        print("  No .stdf files found in STDF_Files directory")
         return True
     
     # Test with first file
     test_file = os.path.join(stdf_dir, stdf_files[0])
-    print(f"\n📁 Testing with: {os.path.basename(test_file)}")
+    print(f"\n Testing with: {os.path.basename(test_file)}")
     
     try:
-        print("🚀 Starting C++ STDF parsing...")
+        print(" Starting C++ STDF parsing...")
         start_time = time.time()
         result = stdf_parser_cpp.parse_stdf_file(test_file)
         end_time = time.time()
         
-        print(f"✅ C++ parsing completed in {end_time - start_time:.2f} seconds")
+        print(f" C++ parsing completed in {end_time - start_time:.2f} seconds")
         
         # Handle different result formats
         if isinstance(result, dict):
@@ -326,7 +328,7 @@ def test_measurements():
         
         # Debug: Check first record format
         if records:
-            print(f"\n🔍 First record format:")
+            print(f"\n First record format:")
             print(f"  Type: {type(records[0])}")
             if hasattr(records[0], '__dict__'):
                 print(f"  Content: {records[0].__dict__}")
@@ -336,19 +338,19 @@ def test_measurements():
                 print(f"  Value: {repr(records[0])[:200]}...")
         
         # Extract measurements (like Python parser)
-        print("\n🔄 Extracting measurements (like Python parser)...")
+        print("\n Extracting measurements (like Python parser)...")
         extract_start = time.time()
         extracted_data = extract_measurements(records)
         extract_end = time.time()
         
-        print(f"✅ Measurement extraction completed in {extract_end - extract_start:.2f} seconds")
+        print(f" Measurement extraction completed in {extract_end - extract_start:.2f} seconds")
         
         # Analyze results
         analyze_measurements(extracted_data)
         
         # Performance summary
         total_time = extract_end - start_time
-        print(f"\n⚡ Performance Summary:")
+        print(f"\n Performance Summary:")
         print(f"  C++ parsing: {end_time - start_time:.2f}s")
         print(f"  Data extraction: {extract_end - extract_start:.2f}s") 
         print(f"  Total time: {total_time:.2f}s")
@@ -358,21 +360,21 @@ def test_measurements():
         return True
         
     except Exception as e:
-        print(f"❌ Error during testing: {e}")
+        print(f" Error during testing: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 if __name__ == "__main__":
-    print("🚀 STDF C++ Parser - Measurement Extraction Test")
+    print("STDF C++ Parser - Measurement Extraction Test")
     print("=" * 60)
     
     success = test_measurements()
     
     print("=" * 60)
     if success:
-        print("✅ Test completed successfully!")
+        print("Test completed successfully!")
     else:
-        print("❌ Test failed!")
+        print("Test failed!")
     
     sys.exit(0 if success else 1)
