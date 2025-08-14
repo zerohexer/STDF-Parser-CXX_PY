@@ -1,4 +1,5 @@
 #include "../include/stdf_parser.h"
+#include "../include/dynamic_field_extractor.h"
 #include <iostream>
 #include <fstream>
 #include <cstring>
@@ -260,13 +261,15 @@ STDFRecord STDFParser::parse_ptr_record(void* ptr_rec) {
                 debug_count++;
             }
             
-            // Extract all PTR fields using proper libstdf structures
-            record.fields["test_num"] = std::to_string(ptr->TEST_NUM);
-            record.fields["head_num"] = std::to_string(ptr->HEAD_NUM);
-            record.fields["site_num"] = std::to_string(ptr->SITE_NUM);
-            record.fields["test_flg"] = std::to_string(ptr->TEST_FLG);  // ← TARGET FIELD!
-            record.fields["parm_flg"] = std::to_string(ptr->PARM_FLG);
-            record.fields["result"] = std::to_string(ptr->RESULT);
+            // Extract all PTR fields using X-Macros dynamic field extractor (create once, reuse)
+            static DynamicFieldExtractor extractor;
+            DynamicSTDFRecord dynamic_record;
+            extractor.extract_fields(ptr, dynamic_record);
+            
+            // Copy ALL extracted fields from X-Macros to main record
+            for (const auto& field : dynamic_record.fields) {
+                record.fields[field.first] = field.second;
+            }
             
             // Store in record structure for compatibility
             record.test_num = ptr->TEST_NUM;
@@ -380,14 +383,15 @@ STDFRecord STDFParser::parse_mpr_record(void* mpr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_mpr*
             rec_mpr* mpr = (rec_mpr*)rec;
             
-            // Extract all MPR fields using proper libstdf structures
-            record.fields["test_num"] = std::to_string(mpr->TEST_NUM);
-            record.fields["head_num"] = std::to_string(mpr->HEAD_NUM);
-            record.fields["site_num"] = std::to_string(mpr->SITE_NUM);
-            record.fields["test_flg"] = std::to_string(mpr->TEST_FLG);
-            record.fields["parm_flg"] = std::to_string(mpr->PARM_FLG);
-            record.fields["rtn_icnt"] = std::to_string(mpr->RTN_ICNT);
-            record.fields["rslt_cnt"] = std::to_string(mpr->RSLT_CNT);
+            // Extract ALL MPR fields using X-Macros dynamic field extractor
+            static DynamicFieldExtractor extractor;
+            DynamicSTDFRecord dynamic_record;
+            extractor.extract_fields(mpr, dynamic_record);
+            
+            // Copy ALL extracted fields from X-Macros to main record
+            for (const auto& field : dynamic_record.fields) {
+                record.fields[field.first] = field.second;
+            }
             
             // Store in record structure for compatibility
             record.test_num = mpr->TEST_NUM;
@@ -447,18 +451,15 @@ STDFRecord STDFParser::parse_ftr_record(void* ftr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_ftr*
             rec_ftr* ftr = (rec_ftr*)rec;
             
-            // Extract all FTR fields using proper libstdf structures
-            record.fields["test_num"] = std::to_string(ftr->TEST_NUM);
-            record.fields["head_num"] = std::to_string(ftr->HEAD_NUM);
-            record.fields["site_num"] = std::to_string(ftr->SITE_NUM);
-            record.fields["test_flg"] = std::to_string(ftr->TEST_FLG);
-            record.fields["opt_flag"] = std::to_string(ftr->OPT_FLAG);
-            record.fields["cycl_cnt"] = std::to_string(ftr->CYCL_CNT);
-            record.fields["rel_vadr"] = std::to_string(ftr->REL_VADR);
-            record.fields["rept_cnt"] = std::to_string(ftr->REPT_CNT);
-            record.fields["num_fail"] = std::to_string(ftr->NUM_FAIL);
-            record.fields["xfail_ad"] = std::to_string(ftr->XFAIL_AD);
-            record.fields["yfail_ad"] = std::to_string(ftr->YFAIL_AD);
+            // Extract ALL FTR fields using X-Macros dynamic field extractor
+            static DynamicFieldExtractor extractor;
+            DynamicSTDFRecord dynamic_record;
+            extractor.extract_fields(ftr, dynamic_record);
+            
+            // Copy ALL extracted fields from X-Macros to main record
+            for (const auto& field : dynamic_record.fields) {
+                record.fields[field.first] = field.second;
+            }
             
             // Store in record structure for compatibility
             record.test_num = ftr->TEST_NUM;
@@ -524,12 +525,15 @@ STDFRecord STDFParser::parse_hbr_record(void* hbr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_hbr*
             rec_hbr* hbr = (rec_hbr*)rec;
             
-            // Extract all HBR fields using proper libstdf structures
-            record.fields["head_num"] = std::to_string(hbr->HEAD_NUM);
-            record.fields["site_num"] = std::to_string(hbr->SITE_NUM);
-            record.fields["hbin_num"] = std::to_string(hbr->HBIN_NUM);
-            record.fields["hbin_cnt"] = std::to_string(hbr->HBIN_CNT);
-            record.fields["hbin_pf"] = std::string(1, hbr->HBIN_PF);  // Pass/Fail flag
+            // Extract ALL HBR fields using X-Macros dynamic field extractor
+            static DynamicFieldExtractor extractor;
+            DynamicSTDFRecord dynamic_record;
+            extractor.extract_fields(hbr, dynamic_record);
+            
+            // Copy ALL extracted fields from X-Macros to main record
+            for (const auto& field : dynamic_record.fields) {
+                record.fields[field.first] = field.second;
+            }
             
             // Store in record structure for compatibility
             record.head_num = hbr->HEAD_NUM;
@@ -567,12 +571,15 @@ STDFRecord STDFParser::parse_sbr_record(void* sbr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_sbr*
             rec_sbr* sbr = (rec_sbr*)rec;
             
-            // Extract all SBR fields using proper libstdf structures
-            record.fields["head_num"] = std::to_string(sbr->HEAD_NUM);
-            record.fields["site_num"] = std::to_string(sbr->SITE_NUM);
-            record.fields["sbin_num"] = std::to_string(sbr->SBIN_NUM);
-            record.fields["sbin_cnt"] = std::to_string(sbr->SBIN_CNT);
-            record.fields["sbin_pf"] = std::string(1, sbr->SBIN_PF);  // Pass/Fail flag
+            // Extract ALL SBR fields using X-Macros dynamic field extractor
+            static DynamicFieldExtractor extractor;
+            DynamicSTDFRecord dynamic_record;
+            extractor.extract_fields(sbr, dynamic_record);
+            
+            // Copy ALL extracted fields from X-Macros to main record
+            for (const auto& field : dynamic_record.fields) {
+                record.fields[field.first] = field.second;
+            }
             
             // Store in record structure for compatibility
             record.head_num = sbr->HEAD_NUM;
@@ -660,16 +667,15 @@ STDFRecord STDFParser::parse_prr_record(void* prr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_prr*
             rec_prr* prr = (rec_prr*)rec;
             
-            // Extract all PRR fields using proper libstdf structures
-            record.fields["head_num"] = std::to_string(prr->HEAD_NUM);
-            record.fields["site_num"] = std::to_string(prr->SITE_NUM);
-            record.fields["part_flg"] = std::to_string(prr->PART_FLG);
-            record.fields["num_test"] = std::to_string(prr->NUM_TEST);
-            record.fields["hard_bin"] = std::to_string(prr->HARD_BIN);
-            record.fields["soft_bin"] = std::to_string(prr->SOFT_BIN);
-            record.fields["x_coord"] = std::to_string(prr->X_COORD);
-            record.fields["y_coord"] = std::to_string(prr->Y_COORD);
-            record.fields["test_t"] = std::to_string(prr->TEST_T);
+            // Extract ALL PRR fields using X-Macros dynamic field extractor
+            static DynamicFieldExtractor extractor;
+            DynamicSTDFRecord dynamic_record;
+            extractor.extract_fields(prr, dynamic_record);
+            
+            // Copy ALL extracted fields from X-Macros to main record
+            for (const auto& field : dynamic_record.fields) {
+                record.fields[field.first] = field.second;
+            }
             
             // Store in record structure for compatibility
             record.head_num = prr->HEAD_NUM;

@@ -6,23 +6,16 @@
 DynamicFieldExtractor::DynamicFieldExtractor(const std::string& config_file) 
     : config_file_path_(config_file) {
     
-    // Load configuration or use defaults
-    if (!load_configuration(config_file)) {
-        std::cout << "WARNING: Failed to load config, using defaults" << std::endl;
-        
-        // Default configuration - enable common fields
-        enabled_fields_["PTR"] = {"TEST_NUM", "HEAD_NUM", "SITE_NUM", "TEST_FLG", "PARM_FLG", "RESULT"};
-        enabled_fields_["MPR"] = {"TEST_NUM", "HEAD_NUM", "SITE_NUM", "TEST_FLG", "RTN_ICNT", "RSLT_CNT"};
-        enabled_fields_["FTR"] = {"TEST_NUM", "HEAD_NUM", "SITE_NUM", "TEST_FLG", "CYCL_CNT", "NUM_FAIL"};
-        enabled_fields_["HBR"] = {"HEAD_NUM", "SITE_NUM", "HBIN_NUM", "HBIN_CNT", "HBIN_PF"};
-        enabled_fields_["SBR"] = {"HEAD_NUM", "SITE_NUM", "SBIN_NUM", "SBIN_CNT", "SBIN_PF"};
-        enabled_fields_["PRR"] = {"HEAD_NUM", "SITE_NUM", "PART_FLG", "NUM_TEST", "HARD_BIN", "SOFT_BIN"};
-    }
+    // NO CONFIG FILES - Extract ALL fields from .def files automatically
+    std::cout << "🚀 DynamicFieldExtractor: Extracting ALL fields from .def files (no config filtering)" << std::endl;
     
-    // Validate configuration
-    if (!validate_configuration()) {
-        std::cout << "WARNING: Configuration validation failed" << std::endl;
-    }
+    // Enable ALL fields from each .def file
+    enabled_fields_["PTR"] = get_all_available_fields("PTR");
+    enabled_fields_["MPR"] = get_all_available_fields("MPR");
+    enabled_fields_["FTR"] = get_all_available_fields("FTR");
+    enabled_fields_["HBR"] = get_all_available_fields("HBR");
+    enabled_fields_["SBR"] = get_all_available_fields("SBR");
+    enabled_fields_["PRR"] = get_all_available_fields("PRR");
     
     print_configuration_summary();
 }
@@ -234,6 +227,26 @@ std::string field_to_string_helper(unsigned char* field) {
 
 // X-Macros Template Specializations
 
+// Helper function to convert field values to string (handles both numeric and string types)
+template<typename T>
+std::string field_to_string(const T& value) {
+    return std::to_string(value);
+}
+
+// Specialization for string types 
+template<>
+std::string field_to_string<unsigned char*>(unsigned char* const& value) {
+    if (value == nullptr) return "";
+    return std::string(reinterpret_cast<const char*>(value));
+}
+
+// Specialization for dtc_Cn (char*)
+template<>
+std::string field_to_string<char*>(char* const& value) {
+    if (value == nullptr) return "";
+    return std::string(value);
+}
+
 // PTR Record Extraction
 template<>
 void DynamicFieldExtractor::extract_fields<rec_ptr>(rec_ptr* ptr, DynamicSTDFRecord& out_record) {
@@ -242,12 +255,14 @@ void DynamicFieldExtractor::extract_fields<rec_ptr>(rec_ptr* ptr, DynamicSTDFRec
     out_record.type_name = "PTR";
     const std::set<std::string>& enabled = get_enabled_fields("PTR");
     
-    if (enabled.empty()) return;  // No fields enabled for PTR
+    if (enabled.empty()) {
+        return;  // No fields enabled for PTR
+    }
     
-    // X-Macros magic: Generate field extraction code
+    // X-Macros magic: Generate field extraction code with smart type handling
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
-            out_record.fields[name] = std::to_string(ptr->member); \
+            out_record.fields[name] = field_to_string(ptr->member); \
         }
     
     #include "../field_defs/ptr_fields.def"
@@ -272,7 +287,7 @@ void DynamicFieldExtractor::extract_fields<rec_mpr>(rec_mpr* mpr, DynamicSTDFRec
     
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
-            out_record.fields[name] = std::to_string(mpr->member); \
+            out_record.fields[name] = field_to_string(mpr->member); \
         }
     
     #include "../field_defs/mpr_fields.def"
@@ -291,7 +306,7 @@ void DynamicFieldExtractor::extract_fields<rec_ftr>(rec_ftr* ftr, DynamicSTDFRec
     
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
-            out_record.fields[name] = std::to_string(ftr->member); \
+            out_record.fields[name] = field_to_string(ftr->member); \
         }
     
     #include "../field_defs/ftr_fields.def"
@@ -310,7 +325,7 @@ void DynamicFieldExtractor::extract_fields<rec_hbr>(rec_hbr* hbr, DynamicSTDFRec
     
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
-            out_record.fields[name] = std::to_string(hbr->member); \
+            out_record.fields[name] = field_to_string(hbr->member); \
         }
     
     #include "../field_defs/hbr_fields.def"
@@ -329,7 +344,7 @@ void DynamicFieldExtractor::extract_fields<rec_sbr>(rec_sbr* sbr, DynamicSTDFRec
     
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
-            out_record.fields[name] = std::to_string(sbr->member); \
+            out_record.fields[name] = field_to_string(sbr->member); \
         }
     
     #include "../field_defs/sbr_fields.def"
@@ -348,7 +363,7 @@ void DynamicFieldExtractor::extract_fields<rec_prr>(rec_prr* prr, DynamicSTDFRec
     
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
-            out_record.fields[name] = std::to_string(prr->member); \
+            out_record.fields[name] = field_to_string(prr->member); \
         }
     
     #include "../field_defs/prr_fields.def"

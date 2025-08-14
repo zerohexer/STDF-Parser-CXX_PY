@@ -227,21 +227,25 @@ def compare_record_fields(cpp_record, pystdf_record, record_type):
             print(f"    C++ ({cpp_field:<15}) = '{cpp_val}'")
             print(f"    pystdf ({pystdf_field:<12}) = '{pystdf_val}'")
     
-    # Key field checks
-    key_fields = ['test_flg', 'test_num', 'head_num', 'site_num', 'result']
+    # Key field checks - C++ uses uppercase from X-Macros .def files
+    key_fields_cpp = ['TEST_FLG', 'TEST_NUM', 'HEAD_NUM', 'SITE_NUM', 'RESULT']
+    key_fields_pystdf = ['TEST_FLG', 'TEST_NUM', 'HEAD_NUM', 'SITE_NUM', 'RESULT']  # pystdf also uses uppercase
+    
     print(f"\n🎯 KEY FIELD CHECK:")
-    for key_field in key_fields:
-        cpp_val = all_cpp_fields.get(key_field, 'NOT_FOUND')
+    for i, cpp_field in enumerate(key_fields_cpp):
+        pystdf_field = key_fields_pystdf[i]
         
-        # Try different case variations in pystdf
+        cpp_val = all_cpp_fields.get(cpp_field, 'NOT_FOUND')
+        
+        # Try different case variations in pystdf 
         pystdf_val = 'NOT_FOUND'
-        for variant in [key_field, key_field.upper(), key_field.lower()]:
+        for variant in [pystdf_field, pystdf_field.upper(), pystdf_field.lower()]:
             if variant in pystdf_record:
                 pystdf_val = pystdf_record[variant]
                 break
         
         status = "✅ MATCH" if str(cpp_val) == str(pystdf_val) else "❌ DIFF"
-        print(f"  {key_field:<15}: C++='{cpp_val}' vs pystdf='{pystdf_val}' {status}")
+        print(f"  {cpp_field:<15}: C++='{cpp_val}' vs pystdf='{pystdf_val}' {status}")
     
     return {
         'cpp_field_count': len(all_cpp_fields),
