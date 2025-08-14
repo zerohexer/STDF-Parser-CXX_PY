@@ -35,23 +35,25 @@ except ImportError as e:
     print(f"❌ C++ parser not available: {e}")
     exit(1)
 
-# Import ClickHouse integration using clickhouse-connect
+# Import ClickHouse integration using clickhouse-driver (fast native TCP)
 try:
-    from clickhouse_utils_connect import (
+    from clickhouse_driver import Client
+    from clickhouse_utils import (
         optimize_clickhouse_connection, 
         setup_clickhouse_schema, 
         push_to_clickhouse,
+        optimize_table_for_batch_loading,
         create_materialized_views
     )
-    print("✅ ClickHouse integration loaded (clickhouse-connect)")
+    print("✅ ClickHouse integration loaded (clickhouse-driver - native TCP)")
 except ImportError as e:
     print(f"❌ ClickHouse integration not available: {e}")
-    print("Make sure clickhouse-connect is installed: pip install clickhouse-connect")
+    print("Make sure clickhouse-driver is installed: pip install clickhouse-driver")
     exit(1)
 
 
 class STDFProcessor:
-    """Main STDF processor with C++ parsing + ClickHouse integration using clickhouse-connect"""
+    """Main STDF processor with C++ parsing + ClickHouse integration using clickhouse-driver"""
     
     def __init__(self, enable_clickhouse=True, batch_size=10000):
         """
@@ -79,7 +81,7 @@ class STDFProcessor:
         self.debug_comma_tests = 0
         self.debug_single_tests = 0
         
-        print(f"🚀 STDFProcessor initialized (clickhouse-connect edition)")
+        print(f"🚀 STDFProcessor initialized (clickhouse-driver ultra-fast edition)")
         print(f"   ClickHouse integration: {'✅ Enabled' if enable_clickhouse else '❌ Disabled'}")
         print(f"   Batch size: {batch_size:,}")
         print(f"   Platform: {platform.system()} ({platform.machine()})")
@@ -496,15 +498,15 @@ class STDFProcessor:
         except (ValueError, TypeError):
             return 0
     
-    def push_to_clickhouse(self, stdf_file_path, host='localhost', port=8123, database='default', 
+    def push_to_clickhouse(self, stdf_file_path, host='localhost', port=9000, database='default', 
                           user='default', password=''):
         """
-        Push measurements to ClickHouse using clickhouse-connect (Windows compatible!)
+        Push measurements to ClickHouse using clickhouse-driver (fastest native TCP!)
         
         Args:
             stdf_file_path: Path to original STDF file (for hash generation)
             host: ClickHouse server hostname
-            port: ClickHouse HTTP port (default 8123 for clickhouse-connect)
+            port: ClickHouse native TCP port (default 9000 for clickhouse-driver)
             database: Database name
             user: Username for authentication
             password: Password for authentication
@@ -517,7 +519,7 @@ class STDFProcessor:
             print("⚠️ No measurements to push")
             return False
         
-        print(f"\n🚀 Starting ClickHouse integration (clickhouse-connect)...")
+        print(f"\n🚀 Starting ClickHouse integration (clickhouse-driver - native TCP)...")
         clickhouse_start = time.time()
         
         try:
@@ -739,7 +741,7 @@ def main():
     
     # ClickHouse connection args
     parser.add_argument("--ch-host", default="localhost", help="ClickHouse host")
-    parser.add_argument("--ch-port", type=int, default=8123, help="ClickHouse HTTP port (default 8123)")
+    parser.add_argument("--ch-port", type=int, default=9000, help="ClickHouse native TCP port (default 9000)")
     parser.add_argument("--ch-database", default="default", help="ClickHouse database")
     parser.add_argument("--ch-user", default="default", help="ClickHouse user")
     parser.add_argument("--ch-password", default="", help="ClickHouse password")
@@ -747,7 +749,7 @@ def main():
     args = parser.parse_args()
     
     print("🚀 Extract ALL Measurements + ClickHouse Integration")
-    print("   Windows/macOS/Linux Compatible Edition")
+    print("   Ultra-Fast Native TCP Edition (clickhouse-driver)")
     print("=" * 60)
     
     # Process single file or directory
