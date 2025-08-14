@@ -23,7 +23,8 @@ if platform.system() == "Windows":
     extension_config = {
         'sources': [
             'cpp/src/python_bridge.cpp',
-            'cpp/src/stdf_parser.cpp'
+            'cpp/src/stdf_parser.cpp',
+            'cpp/src/dynamic_field_extractor.cpp'
         ],
         'include_dirs': [
             'cpp/include',
@@ -34,7 +35,7 @@ if platform.system() == "Windows":
         ],
         'language': 'c++',
         'extra_compile_args': [
-            '-std=c++14',
+            '-std=c++17',  # Updated for X-Macros
             '-O3',
             '-DWIN32',
             '-DNDEBUG',

@@ -87,22 +87,22 @@ def extract_measurements(records):
                 'head_num': ptr.get('head_num', 0),
                 'site_num': ptr.get('site_num', 0),
                 'result': ptr.get('result', 0.0),
-                'test_flg': fields.get('TEST_FLG', ''),
-                'parm_flg': fields.get('PARM_FLG', ''),
+                'test_flg': fields.get('test_flg', ''),
+                'parm_flg': fields.get('parm_flg', ''),
                 'test_txt': ptr.get('test_txt', ''),
                 'alarm_id': ptr.get('alarm_id', ''),
-                'opt_flag': fields.get('OPT_FLAG', ''),
-                'res_scal': fields.get('RES_SCAL', ''),
-                'llm_scal': fields.get('LLM_SCAL', ''),
-                'hlm_scal': fields.get('HLM_SCAL', ''),
-                'lo_limit': fields.get('LO_LIMIT', ''),
-                'hi_limit': fields.get('HI_LIMIT', ''),
+                'opt_flag': fields.get('opt_flag', ''),
+                'res_scal': fields.get('res_scal', ''),
+                'llm_scal': fields.get('llm_scal', ''),
+                'hlm_scal': fields.get('hlm_scal', ''),
+                'lo_limit': fields.get('lo_limit', ''),
+                'hi_limit': fields.get('hi_limit', ''),
                 'units': ptr.get('units', ''),
-                'c_resfmt': fields.get('C_RESFMT', ''),
-                'c_llmfmt': fields.get('C_LLMFMT', ''),
-                'c_hlmfmt': fields.get('C_HLMFMT', ''),
-                'lo_spec': fields.get('LO_SPEC', ''),
-                'hi_spec': fields.get('HI_SPEC', '')
+                'c_resfmt': fields.get('c_resfmt', ''),
+                'c_llmfmt': fields.get('c_llmfmt', ''),
+                'c_hlmfmt': fields.get('c_hlmfmt', ''),
+                'lo_spec': fields.get('lo_spec', ''),
+                'hi_spec': fields.get('hi_spec', '')
             }
 
 
@@ -114,10 +114,20 @@ def extract_measurements(records):
                 parameters.add(measurement['alarm_id'])
                 
             measurements.append(measurement)
+            
+            # Print first PTR record for debugging
+            if len(measurements) == 1:
+                print(f"\n === Sample PTR Record ===")
+                for key, value in measurement.items():
+                    print(f"  {key} = {value}")
+                # Show available fields in the raw record
+                print(f"  Raw fields available: {list(fields.keys()) if fields else 'None'}")
+                print(f"  PTR Test flag (target): {measurement['test_flg']}")  # Original question
     
     # Process MPR (Multiple-Result Parametric Records)
     if 'MPR' in record_types:
         print(f"\n Processing {len(record_types['MPR'])} MPR records...")
+        mpr_count = 0
         for mpr in record_types['MPR']:
             fields = mpr.get('fields', {})
             
@@ -126,10 +136,10 @@ def extract_measurements(records):
                 'test_num': mpr.get('test_num', 0),
                 'head_num': mpr.get('head_num', 0),
                 'site_num': mpr.get('site_num', 0),
-                'test_flg': fields.get('TEST_FLG', ''),
-                'parm_flg': fields.get('PARM_FLG', ''),
-                'rtn_icnt': fields.get('RTN_ICNT', ''),
-                'rslt_cnt': fields.get('RSLT_CNT', ''),
+                'test_flg': fields.get('test_flg', ''),
+                'parm_flg': fields.get('parm_flg', ''),
+                'rtn_icnt': fields.get('rtn_icnt', ''),
+                'rslt_cnt': fields.get('rslt_cnt', ''),
                 'test_txt': mpr.get('test_txt', ''),
                 'alarm_id': mpr.get('alarm_id', ''),
                 'opt_flag': fields.get('OPT_FLAG', ''),
@@ -150,10 +160,20 @@ def extract_measurements(records):
                 parameters.add(measurement['alarm_id'])
                 
             measurements.append(measurement)
+            mpr_count += 1
+            
+            # Print first MPR record for debugging
+            if mpr_count == 1:
+                print(f"\n === Sample MPR Record ===")
+                for key, value in measurement.items():
+                    print(f"  {key} = {value}")
+                # Show available fields in the raw record
+                print(f"  Raw fields available: {list(fields.keys()) if fields else 'None'}")
     
     # Process FTR (Functional Test Records)  
     if 'FTR' in record_types:
         print(f"\n Processing {len(record_types['FTR'])} FTR records...")
+        ftr_count = 0
         for ftr in record_types['FTR']:
             fields = ftr.get('fields', {})
             
@@ -162,12 +182,12 @@ def extract_measurements(records):
                 'test_num': ftr.get('test_num', 0),
                 'head_num': ftr.get('head_num', 0), 
                 'site_num': ftr.get('site_num', 0),
-                'test_flg': fields.get('TEST_FLG', ''),
-                'opt_flag': fields.get('OPT_FLAG', ''),
-                'cycl_cnt': fields.get('CYCL_CNT', ''),
-                'rel_vadr': fields.get('REL_VADR', ''),
-                'rept_cnt': fields.get('REPT_CNT', ''),
-                'num_fail': fields.get('NUM_FAIL', ''),
+                'test_flg': fields.get('test_flg', ''),
+                'opt_flag': fields.get('opt_flag', ''),
+                'cycl_cnt': fields.get('cycl_cnt', ''),
+                'rel_vadr': fields.get('rel_vadr', ''),
+                'rept_cnt': fields.get('rept_cnt', ''),
+                'num_fail': fields.get('num_fail', ''),
                 'xfail_ad': fields.get('XFAIL_AD', ''),
                 'yfail_ad': fields.get('YFAIL_AD', ''),
                 'vect_nam': fields.get('VECT_NAM', ''),
@@ -187,6 +207,15 @@ def extract_measurements(records):
                 parameters.add(measurement['alarm_id'])
                 
             measurements.append(measurement)
+            ftr_count += 1
+            
+            # Print first FTR record for debugging
+            if ftr_count == 1:
+                print(f"\n === Sample FTR Record ===")
+                for key, value in measurement.items():
+                    print(f"  {key} = {value}")
+                # Show available fields in the raw record
+                print(f"  Raw fields available: {list(fields.keys()) if fields else 'None'}")
     
     # Process PRR (Part Result Records) for device information
     prr_devices = []
@@ -198,16 +227,16 @@ def extract_measurements(records):
             device_info = {
                 'head_num': prr.get('head_num', 0),
                 'site_num': prr.get('site_num', 0),
-                'part_flg': fields.get('PART_FLG', ''),
-                'num_test': fields.get('NUM_TEST', ''),
-                'hard_bin': fields.get('HARD_BIN', ''),
-                'soft_bin': fields.get('SOFT_BIN', ''),
-                'x_coord': fields.get('X_COORD', ''),
-                'y_coord': fields.get('Y_COORD', ''),
-                'test_t': fields.get('TEST_T', ''),
-                'part_id': fields.get('PART_ID', ''),
-                'part_txt': fields.get('PART_TXT', ''),
-                'part_fix': fields.get('PART_FIX', '')
+                'part_flg': fields.get('part_flg', ''),
+                'num_test': fields.get('num_test', ''),
+                'hard_bin': fields.get('hard_bin', ''),
+                'soft_bin': fields.get('soft_bin', ''),
+                'x_coord': fields.get('x_coord', ''),
+                'y_coord': fields.get('y_coord', ''),
+                'test_t': fields.get('test_t', ''),
+                'part_id': fields.get('part_id', ''),
+                'part_txt': fields.get('part_txt', ''),
+                'part_fix': fields.get('part_fix', '')
             }
             
             if device_info['part_txt']:
@@ -216,7 +245,51 @@ def extract_measurements(records):
                 devices.add(device_info['part_id'])
                 
             prr_devices.append(device_info)
+            
+            # Print first PRR record for debugging
+            if len(prr_devices) == 1:
+                print(f"\n === Sample PRR Record ===")
+                for key, value in device_info.items():
+                    print(f"  {key} = {value}")
     
+    # Process HBR (Hardware Bin Records) - for debugging
+    if 'HBR' in record_types:
+        print(f"\n Processing {len(record_types['HBR'])} HBR records...")
+        for i, hbr in enumerate(record_types['HBR']):
+            if i == 0:  # Print first HBR record
+                print(f"\n === Sample HBR Record ===")
+                fields = hbr.get('fields', {})
+                sample_hbr = {
+                    'record_type': 'HBR',
+                    'head_num': hbr.get('head_num', 0),
+                    'site_num': hbr.get('site_num', 0),
+                    'hbin_num': fields.get('hbin_num', ''),
+                    'hbin_cnt': fields.get('hbin_cnt', ''),
+                    'hbin_pf': fields.get('hbin_pf', ''),
+                    'hbin_nam': fields.get('hbin_nam', '')
+                }
+                for key, value in sample_hbr.items():
+                    print(f"  {key} = {value}")
+    
+    # Process SBR (Software Bin Records) - for debugging  
+    if 'SBR' in record_types:
+        print(f"\n Processing {len(record_types['SBR'])} SBR records...")
+        for i, sbr in enumerate(record_types['SBR']):
+            if i == 0:  # Print first SBR record
+                print(f"\n === Sample SBR Record ===")
+                fields = sbr.get('fields', {})
+                sample_sbr = {
+                    'record_type': 'SBR',
+                    'head_num': sbr.get('head_num', 0),
+                    'site_num': sbr.get('site_num', 0),
+                    'sbin_num': fields.get('sbin_num', ''),
+                    'sbin_cnt': fields.get('sbin_cnt', ''),
+                    'sbin_pf': fields.get('sbin_pf', ''),
+                    'sbin_nam': fields.get('sbin_nam', '')
+                }
+                for key, value in sample_sbr.items():
+                    print(f"  {key} = {value}")
+
     return {
         'measurements': measurements,
         'devices': list(devices),

@@ -1,5 +1,6 @@
 #include <Python.h>
 #include "../include/stdf_parser.h"
+#include "../include/dynamic_field_extractor.h"
 #include <iostream>
 #include <vector>
 
@@ -72,6 +73,10 @@ static PyObject* parse_stdf_file(PyObject* self, PyObject* args) {
         // Create parser and parse file
         STDFParser parser;
         std::vector<STDFRecord> records = parser.parse_file(std::string(filepath));
+        
+        // TODO: Integrate X-Macros dynamic extraction
+        // For now, the existing parser includes the basic fields
+        // X-Macros integration will enhance field extraction
         
         // Convert results to Python list
         PyObject* results_list = PyList_New(records.size());

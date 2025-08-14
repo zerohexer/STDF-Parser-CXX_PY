@@ -10,6 +10,7 @@ stdf_parser_extension = Extension(
     'stdf_parser_cpp',
     sources=[
         'cpp/src/stdf_parser.cpp',
+        'cpp/src/dynamic_field_extractor.cpp',
         'cpp/src/python_bridge.cpp'
     ],
     include_dirs=[
@@ -28,13 +29,13 @@ stdf_parser_extension = Extension(
     ],
     language='c++',
     extra_compile_args=[
-        '-std=c++14',
+        '-std=c++17',  # Updated for X-Macros
         '-O3',  # Optimization
         '-Wall',
         '-Wextra',
     ],
     extra_link_args=[
-        '-std=c++14',
+        '-std=c++17',
     ],
 )
 

@@ -228,12 +228,8 @@ std::string DynamicFieldExtractor::field_to_string(const char* str_field) const 
     return str_field ? std::string(str_field) : "";
 }
 
-std::string field_to_string_helper(dtc_Bn bin_field) {
-    return bin_field ? "present" : "not_present";
-}
-
-std::string field_to_string_helper(dtc_Dn data_field) {
-    return data_field ? "present" : "not_present";
+std::string field_to_string_helper(unsigned char* field) {
+    return field ? "present" : "not_present";
 }
 
 // X-Macros Template Specializations
