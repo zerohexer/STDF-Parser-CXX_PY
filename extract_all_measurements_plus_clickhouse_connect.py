@@ -17,6 +17,7 @@ import platform
 import time
 import argparse
 import sys
+import hashlib
 from datetime import datetime
 
 # Platform setup for C++ library
@@ -72,6 +73,7 @@ class STDFProcessor:
         self.param_id_map = {}   # WTP_PARAM_NAME -> WTP_ID
         self.device_counter = 0
         self.param_counter = 0
+        self.current_file_hash = None  # For deduplication
         
         # Debug counters from original
         self.debug_comma_tests = 0
@@ -159,6 +161,34 @@ class STDFProcessor:
                 print(f"⚠️ Error inserting parameter mapping to ClickHouse: {e}")
         
         return new_wtp_id
+    
+    def _generate_file_hash(self, file_path):
+        """Generate MD5 hash of the file for deduplication (like original STDF_Parser_CH.py)"""
+        hash_md5 = hashlib.md5()
+        try:
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+            return hash_md5.hexdigest()
+        except Exception as e:
+            print(f"⚠️ Error generating file hash: {e}")
+            return None
+    
+    def _is_file_already_processed(self, file_hash, client=None):
+        """Check if file with this hash has already been processed"""
+        if not file_hash or not client:
+            return False
+        
+        try:
+            query = f"SELECT COUNT(*) FROM measurements WHERE file_hash = '{file_hash}' LIMIT 1"
+            rows = client.execute(query)
+            if rows and len(rows) > 0:
+                count = rows[0][0]
+                return count > 0
+        except Exception as e:
+            print(f"⚠️ Error checking file hash in database: {e}")
+        
+        return False
     
     def extract_measurements(self, stdf_file_path):
         """Extract ALL measurements from STDF file using C++ parser"""
@@ -563,6 +593,10 @@ class STDFProcessor:
                         if param_name and param_name != 'unknown':
                             persistent_param_id = self.processor.get_param_id(param_name, client)
                             measurement['WTP_ID'] = persistent_param_id
+                        
+                        # Add file hash for deduplication (like original STDF_Parser_CH.py)
+                        if self.processor.current_file_hash:
+                            measurement['FILE_HASH'] = self.processor.current_file_hash
                     
                     # Update the mappings in this object
                     self.device_id_map = self.processor.device_id_map
@@ -576,6 +610,28 @@ class STDFProcessor:
             
             client = optimize_clickhouse_connection(host, port, database, user, password)
             setup_clickhouse_schema(client)
+            
+            # Step 2.1: Check for file deduplication
+            print(f"🔍 Checking file deduplication...")
+            file_hash = self._generate_file_hash(stdf_file_path)
+            if file_hash:
+                print(f"   📄 File hash: {file_hash}")
+                self.current_file_hash = file_hash
+                
+                if self._is_file_already_processed(file_hash, client):
+                    filename = os.path.basename(stdf_file_path)
+                    print(f"⚠️ File {filename} already processed (hash: {file_hash})")
+                    print(f"⚠️ Skipping to prevent duplicates")
+                    return {
+                        'success': False,
+                        'message': 'File already processed',
+                        'file_hash': file_hash,
+                        'duplicate_prevention': True
+                    }
+                else:
+                    print(f"✅ File not previously processed, continuing...")
+            else:
+                print(f"⚠️ Could not generate file hash, proceeding without deduplication")
             
             # Try to create materialized views
             try:
