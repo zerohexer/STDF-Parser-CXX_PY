@@ -231,6 +231,17 @@ std::string field_to_string<char*>(char* const& value) {
     return std::string(value);
 }
 
+// Specialization for float* arrays (like RTN_RSLT)
+template<>
+std::string field_to_string<float*>(float* const& value) {
+    if (value == nullptr) return "";
+    
+    // For float arrays, we'll need the count from the record context
+    // For now, just indicate it's an array - the actual processing
+    // should be done at the record level using RTN_ICNT/RSLT_CNT
+    return "[float_array]";
+}
+
 // Specialization for unsigned char* (dtc_Bn - binary data)
 template<>
 std::string field_to_string<unsigned char*>(unsigned char* const& value) {
@@ -284,10 +295,24 @@ void DynamicFieldExtractor::extract_fields<rec_mpr>(rec_mpr* mpr, DynamicSTDFRec
     
     if (enabled.empty()) return;
     
-    // X-Macros: Unified field extraction
+    // X-Macros: Unified field extraction (but handle RTN_RSLT specially)
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
-            out_record.fields[name] = field_to_string(mpr->member); \
+            if (std::string(name) == "RTN_RSLT") { \
+                /* Special handling for RTN_RSLT array with RSLT_CNT */ \
+                if (mpr->RTN_RSLT != nullptr && mpr->RSLT_CNT > 0) { \
+                    std::ostringstream oss; \
+                    for (int i = 0; i < mpr->RSLT_CNT; i++) { \
+                        if (i > 0) oss << ","; \
+                        oss << mpr->RTN_RSLT[i]; \
+                    } \
+                    out_record.fields[name] = oss.str(); \
+                } else { \
+                    out_record.fields[name] = ""; \
+                } \
+            } else { \
+                out_record.fields[name] = field_to_string(mpr->member); \
+            } \
         }
     
     #include "../field_defs/mpr_fields.def"

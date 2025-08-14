@@ -1,6 +1,7 @@
 // MPR (Multiple-Result Parametric Record) Field Definitions
 // Format: FIELD(field_name, member_name)
 
+// Basic fields (always available)
 FIELD("TEST_NUM", TEST_NUM)
 FIELD("HEAD_NUM", HEAD_NUM)
 FIELD("SITE_NUM", SITE_NUM)
@@ -8,3 +9,19 @@ FIELD("TEST_FLG", TEST_FLG)
 FIELD("PARM_FLG", PARM_FLG)
 FIELD("RTN_ICNT", RTN_ICNT)
 FIELD("RSLT_CNT", RSLT_CNT)
+
+// String fields (crucial for measurement data)
+FIELD("TEST_TXT", TEST_TXT)
+FIELD("ALARM_ID", ALARM_ID)
+FIELD("UNITS", UNITS)
+
+// Limit fields
+FIELD("LO_LIMIT", LO_LIMIT)
+FIELD("HI_LIMIT", HI_LIMIT)
+
+// Result arrays (CRITICAL - contains multiple measurement results)
+FIELD("RTN_RSLT", RTN_RSLT)
+
+// Additional optional fields
+FIELD("RTN_STAT", RTN_STAT)
+FIELD("OPT_FLAG", OPT_FLAG)
