@@ -60,13 +60,6 @@ private:
     // Helper functions
     std::string trim(const std::string& str) const;
     bool parse_json_config(const std::string& json_content);
-    
-    // Field conversion utilities
-    template<typename T>
-    std::string field_to_string(T value) const;
-    
-    std::string field_to_string(char* str_field) const;
-    std::string field_to_string(const char* str_field) const;
 };
 
 // Template specializations for each record type (implemented in .cpp file)

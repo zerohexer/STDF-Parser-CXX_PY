@@ -202,49 +202,48 @@ void DynamicFieldExtractor::print_configuration_summary() const {
     }
 }
 
-// Field conversion utilities
-template<typename T>
-std::string DynamicFieldExtractor::field_to_string(T value) const {
-    return std::to_string(value);
-}
+// ============================================================================
+// UNIFIED FIELD CONVERSION SYSTEM - No Duplicates!
+// ============================================================================
 
-std::string DynamicFieldExtractor::field_to_string(char* str_field) const {
-    if (!str_field || str_field[0] == '\0') return "";
-    // Check if this is an STDF string (first byte is length)
-    if ((unsigned char)str_field[0] <= strlen(str_field + 1)) {
-        return std::string(str_field + 1);  // Skip length byte
-    }
-    return std::string(str_field);  // Regular C string
-}
-
-std::string DynamicFieldExtractor::field_to_string(const char* str_field) const {
-    return str_field ? std::string(str_field) : "";
-}
-
-std::string field_to_string_helper(unsigned char* field) {
-    return field ? "present" : "not_present";
-}
-
-// X-Macros Template Specializations
-
-// Helper function to convert field values to string (handles both numeric and string types)
+// Generic template for numeric types (uint32_t, float, etc.)
 template<typename T>
 std::string field_to_string(const T& value) {
     return std::to_string(value);
 }
 
-// Specialization for string types 
-template<>
-std::string field_to_string<unsigned char*>(unsigned char* const& value) {
-    if (value == nullptr) return "";
-    return std::string(reinterpret_cast<const char*>(value));
-}
-
-// Specialization for dtc_Cn (char*)
+// Specialization for STDF string types (dtc_Cn - char*)
 template<>
 std::string field_to_string<char*>(char* const& value) {
     if (value == nullptr) return "";
+    
+    // STDF strings: First byte is length, actual string starts at value+1
+    // But some strings might be regular C strings, so we need to detect
+    unsigned char len = (unsigned char)value[0];
+    size_t actual_len = strlen(value + 1);
+    
+    // If first byte looks like a length byte and matches actual string length
+    if (len > 0 && len <= actual_len + 1 && len < 256) {
+        return std::string(value + 1);  // Skip STDF length byte
+    }
+    
+    // Otherwise treat as regular C string
     return std::string(value);
+}
+
+// Specialization for unsigned char* (dtc_Bn - binary data)
+template<>
+std::string field_to_string<unsigned char*>(unsigned char* const& value) {
+    if (value == nullptr) return "";
+    
+    // For binary fields, just indicate presence
+    return "present";
+}
+
+// Specialization for const char*
+template<>
+std::string field_to_string<const char*>(const char* const& value) {
+    return value ? std::string(value) : "";
 }
 
 // PTR Record Extraction
@@ -259,7 +258,7 @@ void DynamicFieldExtractor::extract_fields<rec_ptr>(rec_ptr* ptr, DynamicSTDFRec
         return;  // No fields enabled for PTR
     }
     
-    // X-Macros magic: Generate field extraction code with smart type handling
+    // X-Macros magic: Generate field extraction code with unified type handling
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
             out_record.fields[name] = field_to_string(ptr->member); \
@@ -285,6 +284,7 @@ void DynamicFieldExtractor::extract_fields<rec_mpr>(rec_mpr* mpr, DynamicSTDFRec
     
     if (enabled.empty()) return;
     
+    // X-Macros: Unified field extraction
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
             out_record.fields[name] = field_to_string(mpr->member); \
@@ -304,6 +304,7 @@ void DynamicFieldExtractor::extract_fields<rec_ftr>(rec_ftr* ftr, DynamicSTDFRec
     
     if (enabled.empty()) return;
     
+    // X-Macros: Unified field extraction
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
             out_record.fields[name] = field_to_string(ftr->member); \
@@ -323,6 +324,7 @@ void DynamicFieldExtractor::extract_fields<rec_hbr>(rec_hbr* hbr, DynamicSTDFRec
     
     if (enabled.empty()) return;
     
+    // X-Macros: Unified field extraction
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
             out_record.fields[name] = field_to_string(hbr->member); \
@@ -342,6 +344,7 @@ void DynamicFieldExtractor::extract_fields<rec_sbr>(rec_sbr* sbr, DynamicSTDFRec
     
     if (enabled.empty()) return;
     
+    // X-Macros: Unified field extraction
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
             out_record.fields[name] = field_to_string(sbr->member); \
@@ -361,6 +364,7 @@ void DynamicFieldExtractor::extract_fields<rec_prr>(rec_prr* prr, DynamicSTDFRec
     
     if (enabled.empty()) return;
     
+    // X-Macros: Unified field extraction
     #define FIELD(name, member) \
         if (enabled.count(name)) { \
             out_record.fields[name] = field_to_string(prr->member); \
