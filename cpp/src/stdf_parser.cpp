@@ -8,6 +8,9 @@
 // libstdf headers
 #include <libstdf.h>
 
+// Global shared DynamicFieldExtractor (created once, reused everywhere)
+static DynamicFieldExtractor g_field_extractor;
+
 STDFParser::STDFParser() 
     : stdf_file_handle_(nullptr)
     , total_records_(0)
@@ -261,10 +264,9 @@ STDFRecord STDFParser::parse_ptr_record(void* ptr_rec) {
                 debug_count++;
             }
             
-            // Extract all PTR fields using X-Macros dynamic field extractor (create once, reuse)
-            static DynamicFieldExtractor extractor;
+            // Extract all PTR fields using global shared extractor
             DynamicSTDFRecord dynamic_record;
-            extractor.extract_fields(ptr, dynamic_record);
+            g_field_extractor.extract_fields(ptr, dynamic_record);
             
             // Copy ALL extracted fields from X-Macros to main record
             for (const auto& field : dynamic_record.fields) {
@@ -383,10 +385,9 @@ STDFRecord STDFParser::parse_mpr_record(void* mpr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_mpr*
             rec_mpr* mpr = (rec_mpr*)rec;
             
-            // Extract ALL MPR fields using X-Macros dynamic field extractor
-            static DynamicFieldExtractor extractor;
+            // Extract ALL MPR fields using global shared extractor
             DynamicSTDFRecord dynamic_record;
-            extractor.extract_fields(mpr, dynamic_record);
+            g_field_extractor.extract_fields(mpr, dynamic_record);
             
             // Copy ALL extracted fields from X-Macros to main record
             for (const auto& field : dynamic_record.fields) {
@@ -451,10 +452,9 @@ STDFRecord STDFParser::parse_ftr_record(void* ftr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_ftr*
             rec_ftr* ftr = (rec_ftr*)rec;
             
-            // Extract ALL FTR fields using X-Macros dynamic field extractor
-            static DynamicFieldExtractor extractor;
+            // Extract ALL FTR fields using global shared extractor
             DynamicSTDFRecord dynamic_record;
-            extractor.extract_fields(ftr, dynamic_record);
+            g_field_extractor.extract_fields(ftr, dynamic_record);
             
             // Copy ALL extracted fields from X-Macros to main record
             for (const auto& field : dynamic_record.fields) {
@@ -525,10 +525,9 @@ STDFRecord STDFParser::parse_hbr_record(void* hbr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_hbr*
             rec_hbr* hbr = (rec_hbr*)rec;
             
-            // Extract ALL HBR fields using X-Macros dynamic field extractor
-            static DynamicFieldExtractor extractor;
+            // Extract ALL HBR fields using global shared extractor
             DynamicSTDFRecord dynamic_record;
-            extractor.extract_fields(hbr, dynamic_record);
+            g_field_extractor.extract_fields(hbr, dynamic_record);
             
             // Copy ALL extracted fields from X-Macros to main record
             for (const auto& field : dynamic_record.fields) {
@@ -571,10 +570,9 @@ STDFRecord STDFParser::parse_sbr_record(void* sbr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_sbr*
             rec_sbr* sbr = (rec_sbr*)rec;
             
-            // Extract ALL SBR fields using X-Macros dynamic field extractor
-            static DynamicFieldExtractor extractor;
+            // Extract ALL SBR fields using global shared extractor
             DynamicSTDFRecord dynamic_record;
-            extractor.extract_fields(sbr, dynamic_record);
+            g_field_extractor.extract_fields(sbr, dynamic_record);
             
             // Copy ALL extracted fields from X-Macros to main record
             for (const auto& field : dynamic_record.fields) {
@@ -667,10 +665,9 @@ STDFRecord STDFParser::parse_prr_record(void* prr_rec) {
             // Official libstdf approach: cast rec_unknown* to rec_prr*
             rec_prr* prr = (rec_prr*)rec;
             
-            // Extract ALL PRR fields using X-Macros dynamic field extractor
-            static DynamicFieldExtractor extractor;
+            // Extract ALL PRR fields using global shared extractor
             DynamicSTDFRecord dynamic_record;
-            extractor.extract_fields(prr, dynamic_record);
+            g_field_extractor.extract_fields(prr, dynamic_record);
             
             // Copy ALL extracted fields from X-Macros to main record
             for (const auto& field : dynamic_record.fields) {

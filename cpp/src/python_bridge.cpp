@@ -119,10 +119,80 @@ static PyObject* get_version(PyObject* self, PyObject* args) {
     return PyUnicode_FromString("STDFParser C++ Extension v1.0.0");
 }
 
+// Helper function to safely extract string from Python dict
+static std::string extract_dict_string(PyObject* dict, const char* key, const std::string& default_val = "") {
+    if (!dict || !PyDict_Check(dict)) return default_val;
+    
+    PyObject* item = PyDict_GetItemString(dict, key);
+    if (!item || !PyUnicode_Check(item)) return default_val;
+    
+    const char* str = PyUnicode_AsUTF8(item);
+    return str ? std::string(str) : default_val;
+}
+
+// Option 1: Pre-compute expensive fields in C++, return to Python for object assembly
+static PyObject* precompute_measurement_fields(PyObject* self, PyObject* args) {
+    PyObject* mir_data_dict;
+    PyObject* prr_data_dict;
+    
+    // Parse Python arguments
+    if (!PyArg_ParseTuple(args, "OO", &mir_data_dict, &prr_data_dict)) {
+        return nullptr;
+    }
+    
+    // Pre-compute expensive operations in C++ (ONCE per test, not per measurement)
+    std::string facility = extract_dict_string(mir_data_dict, "facility");
+    std::string operation = extract_dict_string(mir_data_dict, "operation");
+    std::string lot_name = extract_dict_string(mir_data_dict, "lot_name");
+    std::string equipment = extract_dict_string(mir_data_dict, "equipment");
+    std::string prog_name = extract_dict_string(mir_data_dict, "prog_name");
+    std::string prog_version = extract_dict_string(mir_data_dict, "prog_version");
+    std::string start_time = extract_dict_string(mir_data_dict, "start_time");
+    
+    std::string device_dmc = extract_dict_string(prr_data_dict, "device_dmc");
+    std::string bin_code = extract_dict_string(prr_data_dict, "bin_code");
+    
+    // C++ logic for expensive computations (computed once, reused many times)
+    bool is_pass = (bin_code == "1");
+    std::string bin_desc = is_pass ? "PASS" : "FAIL";
+    bool test_flag = is_pass;
+    
+    // Return pre-computed values as Python dict
+    PyObject* computed_fields = PyDict_New();
+    if (!computed_fields) return nullptr;
+    
+    // Set all the expensive-to-compute fields:
+    PyDict_SetItemString(computed_fields, "WFI_FACILITY", PyUnicode_FromString(facility.c_str()));
+    PyDict_SetItemString(computed_fields, "WFI_OPERATION", PyUnicode_FromString(operation.c_str()));
+    PyDict_SetItemString(computed_fields, "WL_LOT_NAME", PyUnicode_FromString(lot_name.c_str()));
+    PyDict_SetItemString(computed_fields, "WFI_EQUIPMENT", PyUnicode_FromString(equipment.c_str()));
+    PyDict_SetItemString(computed_fields, "WMP_PROG_NAME", PyUnicode_FromString(prog_name.c_str()));
+    PyDict_SetItemString(computed_fields, "WMP_PROG_VERSION", PyUnicode_FromString(prog_version.c_str()));
+    PyDict_SetItemString(computed_fields, "WPTM_CREATED_DATE", PyUnicode_FromString(start_time.c_str()));
+    PyDict_SetItemString(computed_fields, "WLD_CREATED_DATE", PyUnicode_FromString(start_time.c_str()));
+    
+    PyDict_SetItemString(computed_fields, "WLD_DEVICE_DMC", PyUnicode_FromString(device_dmc.c_str()));
+    PyDict_SetItemString(computed_fields, "WLD_BIN_CODE", PyUnicode_FromString(bin_code.c_str()));
+    PyDict_SetItemString(computed_fields, "WLD_BIN_DESC", PyUnicode_FromString(bin_desc.c_str()));
+    PyDict_SetItemString(computed_fields, "TEST_FLAG", PyBool_FromLong(test_flag));
+    
+    // Constant fields (computed once in C++)
+    PyDict_SetItemString(computed_fields, "WLD_PHOENIX_ID", PyUnicode_FromString(""));
+    PyDict_SetItemString(computed_fields, "WLD_LATEST", PyUnicode_FromString("Y"));
+    PyDict_SetItemString(computed_fields, "SFT_NAME", PyUnicode_FromString("STDF_CPP"));
+    PyDict_SetItemString(computed_fields, "SFT_GROUP", PyUnicode_FromString("STDF_CPP"));
+    
+    return computed_fields;
+}
+
+
+
 // Method definitions
 static PyMethodDef StdfParserMethods[] = {
     {"parse_stdf_file", parse_stdf_file, METH_VARARGS,
      "Parse STDF file and return list of records"},
+    {"precompute_measurement_fields", precompute_measurement_fields, METH_VARARGS,
+     "Pre-compute expensive measurement fields in C++"},
     {"get_version", get_version, METH_NOARGS,
      "Get version information"},
     {nullptr, nullptr, 0, nullptr}

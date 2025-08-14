@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Extract ALL Measurements - C++ STDF Parser Edition
-==================================================
+Extract ALL Measurements - Python Computation Edition
+====================================================
 
-Simple, focused measurement extraction using our fast C++ library.
-Extracts ALL measurements, especially pixel tests, with no file saving overhead.
+Pure Python computation version for fair performance comparison.
+Uses C++ parsing but does ALL field computation in Python (no C++ pre-computation).
 """
 
 import os
@@ -22,14 +22,14 @@ if system == "linux":
 
 try:
     import stdf_parser_cpp
-    print("✅ C++ STDF parser loaded")
+    print("✅ C++ STDF parser loaded (parsing only, Python computation)")
 except ImportError as e:
     print(f"❌ C++ parser not available: {e}")
     exit(1)
 
 
-class MeasurementExtractor:
-    """Simple measurement extractor focused on pixel tests"""
+class MeasurementExtractorPyCompute:
+    """Pure Python computation measurement extractor (C++ parsing only)"""
     
     def __init__(self):
         self.measurements = []
@@ -40,7 +40,7 @@ class MeasurementExtractor:
         self.debug_single_tests = 0
         
     def extract_measurements(self, stdf_file_path):
-        """Extract ALL measurements from STDF file using C++ parser"""
+        """Extract ALL measurements from STDF file using C++ parser + Python computation"""
         print(f"🔄 Processing: {os.path.basename(stdf_file_path)}")
         
         start_time = time.time()
@@ -88,7 +88,6 @@ class MeasurementExtractor:
         print(f"🔧 Found {len(prr_records)} PRR records (devices)")
         
         # Get ALL test records - CRITICAL: Original processes MPR and PTR separately!
-        # From uvicorn output: "Processing 92772 MPR records" (per device)
         test_records = []
         
         # Original processes these record types
@@ -174,7 +173,7 @@ class MeasurementExtractor:
         }
     
     def _process_single_test(self, test_record, prr_data, mir_info):
-        """Process a single test record with device context (EXACT STDF_Parser_CH logic)"""
+        """Process a single test record with device context - PURE PYTHON COMPUTATION"""
         test_fields = test_record.get('fields', {})
         
         # Extract test data from C++ extraction (use ALARM_ID as param_name like original)
@@ -247,21 +246,11 @@ class MeasurementExtractor:
         else:
             self.debug_single_tests += 1
         
-        # OPTION 1: Pre-compute expensive fields in C++ (computed ONCE per test, not per measurement)
-        try:
-            import stdf_parser_cpp
-            
-            # C++ pre-computes all expensive fields ONCE per test (not 10 times per measurement)
-            precomputed_fields = stdf_parser_cpp.precompute_measurement_fields(mir_info, prr_data)
-            
-            # Success indicator (only show for first few tests)
-            if self.debug_comma_tests + self.debug_single_tests < 3:
-                print(f"✅ Using C++ pre-computation for test #{self.debug_comma_tests + self.debug_single_tests + 1}")
-            
-        except Exception as e:
-            # Fallback: compute in Python if C++ fails
-            print(f"⚠️ Warning: C++ precompute failed ({e}), using Python fallback computation")
-            precomputed_fields = {
+        # Create measurements for EACH value/result - ALL COMPUTATION IN PYTHON
+        for i, float_value in enumerate(measurement_values):
+            # Create full measurement object (25 fields like original STDF_Parser_CH.py)
+            measurement = {
+                # Core measurement data (matching original _create_measurement_record)
                 'WFI_FACILITY': mir_info.get('facility', ''),
                 'WFI_OPERATION': mir_info.get('operation', ''),
                 'WL_LOT_NAME': mir_info.get('lot_name', ''),
@@ -272,31 +261,23 @@ class MeasurementExtractor:
                 'WLD_BIN_DESC': 'PASS' if prr_data['bin_code'] and prr_data['bin_code'].isdigit() and int(prr_data['bin_code']) == 1 else 'FAIL',
                 'WMP_PROG_NAME': mir_info.get('prog_name', ''),
                 'WMP_PROG_VERSION': mir_info.get('prog_version', ''),
+                'WP_POS_X': pixel_x,
+                'WP_POS_Y': pixel_y,
+                'WTP_PARAM_NAME': cleaned_param_name,
+                'WPTM_VALUE': float_value,
+                'WTP_ID': param_id,
+                'WLD_ID': prr_data['device_id'],
                 'WPTM_CREATED_DATE': mir_info.get('start_time', ''),
                 'SFT_NAME': 'STDF_CPP',
                 'SFT_GROUP': 'STDF_CPP',
                 'WFI_EQUIPMENT': mir_info.get('equipment', ''),
                 'TEST_FLAG': prr_data['bin_code'] and prr_data['bin_code'].isdigit() and int(prr_data['bin_code']) == 1,
                 'WLD_CREATED_DATE': mir_info.get('start_time', ''),
-            }
 
-        # Create measurements for EACH value/result using pre-computed fields
-        for i, float_value in enumerate(measurement_values):
-            # Python assembles measurement object using C++ pre-computed fields (FAST!)
-            measurement = {
-                # Fields that change per measurement:
-                'WTP_PARAM_NAME': cleaned_param_name,
-                'WPTM_VALUE': float_value,
-                'WP_POS_X': pixel_x,
-                'WP_POS_Y': pixel_y,
-                'WTP_ID': param_id,
-                'WLD_ID': prr_data['device_id'],
+                # Additional C++ extracted fields
                 'TEST_NUM': test_num,
                 'TEST_FLG': test_flg,
-                'RECORD_TYPE': test_record.get('record_type', 'MPR'),
-                
-                # Pre-computed fields (same for all 10 measurements from this test):
-                **precomputed_fields  # Python dict unpacking - very fast!
+                'RECORD_TYPE': test_record.get('record_type', 'MPR')
             }
             
             self.measurements.append(measurement)
@@ -430,9 +411,11 @@ class MeasurementExtractor:
 
 
 def main():
-    """Main function to extract all measurements"""
-    print("🚀 Extract ALL Measurements - C++ Edition")
-    print("=" * 50)
+    """Main function to extract all measurements using PURE PYTHON computation"""
+    print("🐍 Extract ALL Measurements - Pure Python Computation Edition")
+    print("=" * 60)
+    print("C++ parsing + Python computation (fair comparison baseline)")
+    print("=" * 60)
     
     # Find STDF file
     stdf_dir = "STDF_Files"
@@ -449,25 +432,26 @@ def main():
     test_file = os.path.join(stdf_dir, stdf_files[0])
     print(f"📁 Processing: {test_file}")
     
-    # Extract measurements
-    extractor = MeasurementExtractor()
+    # Extract measurements with pure Python computation
+    extractor = MeasurementExtractorPyCompute()
     measurements = extractor.extract_measurements(test_file)
     
     # Print results
     extractor.print_statistics()
     extractor.print_sample_measurements()
     
-    # Show original test_flg issue resolution
+    # Show comparison info
     test_flg_measurements = [m for m in measurements if m['TEST_FLG'] and m['TEST_FLG'] != '0']
-    print(f"\n🎯 ORIGINAL ISSUE RESOLUTION:")
+    print(f"\n🎯 PYTHON COMPUTATION BASELINE:")
     print(f"Successfully extracted {len(measurements):,} total measurements with proper TEST_FLG values")
     
     if test_flg_measurements:
         example = test_flg_measurements[0]
         print(f"Example non-zero TEST_FLG: '{example['TEST_FLG']}', PARAM='{example['WTP_PARAM_NAME'][:50]}...'")
     
-    print(f"\n✅ Your original test_flg extraction issue is SOLVED!")
+    print(f"\n✅ Pure Python computation baseline established!")
     print(f"✅ All {len(measurements):,} measurements extracted successfully!")
+    print(f"\n📊 Use this as baseline to compare against C++ pre-computation optimization")
 
 
 if __name__ == "__main__":
