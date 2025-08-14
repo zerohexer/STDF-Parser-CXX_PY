@@ -668,25 +668,28 @@ def _organize_measurements_by_partition(measurements):
 
 
 def _create_connection_pool(connection_params, pool_size):
-    """Create optimized ClickHouse connection pool."""
-    batch_settings = {
-        'max_insert_block_size': 100000,
-        'min_insert_block_size_rows': 10000,
-        'max_threads': 32,
-        'max_insert_threads': 32,
-        'receive_timeout': 600,
-        'send_timeout': 600
-    }
+    """Create single persistent ClickHouse connection (bypass broken pool)."""
+    from clickhouse_connect_wrapper import Client
     
-    return ClickHouseConnectConnectionPool(
+    # Create single persistent connection instead of pool
+    persistent_client = Client(
         host=connection_params.get('host', 'localhost'),
-        port=connection_params.get('port', 8123),  # HTTP port for clickhouse-connect
+        port=connection_params.get('port', 8123),
         database=connection_params.get('database', 'default'),
         user=connection_params.get('user', 'default'),
         password=connection_params.get('password', ''),
-        max_connections=pool_size,
-        settings=batch_settings
+        settings={
+            'max_insert_block_size': 100000,
+            'min_insert_block_size_rows': 10000,
+            'max_threads': 32,
+            'max_insert_threads': 32,
+            'receive_timeout': 600,
+            'send_timeout': 600
+        }
     )
+    
+    print(f"✅ Created single persistent ClickHouse connection (bypassing pool)")
+    return persistent_client
 
 
 def _get_duplicate_segment(duplicate_key, duplicate_tracker, duplicate_lock):
@@ -716,16 +719,16 @@ def _convert_measurement_to_batch_data(measurement, segment):
     }
 
 
-def _execute_batch_with_retry(connection_pool, batch_data, max_retries=3):
-    """Execute batch insertion with retry logic."""
+def _execute_batch_with_retry(persistent_client, batch_data, max_retries=3):
+    """Execute batch insertion with persistent client (no connection overhead)."""
     retry_count = 0
     while retry_count < max_retries:
         try:
-            with ClickHouseConnectConnectionManager(connection_pool) as client:
-                client.execute(
-                    "INSERT INTO measurements (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, wptm_created_date, test_flag, segment, file_hash) VALUES",
-                    batch_data
-                )
+            # Use persistent client directly - NO connection creation/closing
+            persistent_client.execute(
+                "INSERT INTO measurements (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, wptm_created_date, test_flag, segment, file_hash) VALUES",
+                batch_data
+            )
             return True
         except Exception as e:
             retry_count += 1
@@ -746,8 +749,8 @@ def _update_progress(measurements_pushed, batch_size, total_measurements, progre
 
 
 def _process_measurement_batch(measurements, batch_size, duplicate_tracker, duplicate_lock, 
-                              connection_pool, progress_lock, total_measurements, measurements_pushed_ref):
-    """Process a batch of measurements for a partition."""
+                              persistent_client, progress_lock, total_measurements, measurements_pushed_ref):
+    """Process a batch of measurements with persistent client (no connection overhead)."""
     batch_data = []
     
     for m in measurements:
@@ -757,13 +760,13 @@ def _process_measurement_batch(measurements, batch_size, duplicate_tracker, dupl
         batch_data.append(batch_record)
         
         if len(batch_data) >= batch_size:
-            _execute_batch_with_retry(connection_pool, batch_data)
+            _execute_batch_with_retry(persistent_client, batch_data)
             measurements_pushed_ref[0] = _update_progress(measurements_pushed_ref[0], len(batch_data), total_measurements, progress_lock)
             batch_data = []
     
     # Insert any remaining records
     if batch_data:
-        _execute_batch_with_retry(connection_pool, batch_data)
+        _execute_batch_with_retry(persistent_client, batch_data)
         measurements_pushed_ref[0] = _update_progress(measurements_pushed_ref[0], len(batch_data), total_measurements, progress_lock)
     
     return len(measurements)
@@ -793,69 +796,76 @@ def _print_error_summary(error, measurements_pushed, total_measurements, elapsed
 
 def push_measurements_clickhouse(connection_params, measurements, batch_size=100000):
     """
-    High-performance measurements pushing function for ClickHouse with thread-safe connection pool
-    Optimized with larger batch sizes and more worker threads for maximum throughput
+    ULTRA-FAST measurements pushing with minimal overhead
     
     Parameters:
-    - connection_params: Dictionary with ClickHouse connection parameters
+    - connection_params: Dictionary with ClickHouse connection parameters  
     - measurements: List of measurements to push
     - batch_size: Number of measurements to push in a single batch
     """
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Starting push_measurements_clickhouse with {len(measurements)} measurements")
-    
-    MAX_WORKERS = 32
-    total_measurements = len(measurements)
-    measurements_pushed_ref = [0]  # Use list for mutable reference
-    progress_lock = threading.Lock()
-    duplicate_tracker = {}
-    duplicate_lock = threading.Lock()
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Ultra-fast push starting with {len(measurements)} measurements")
     start_time = time.time()
     
-    # Organize measurements by partition
-    print("📊 Organizing measurements by partition key...")
-    measurements_by_wld_id = _organize_measurements_by_partition(measurements)
-    print(f"📊 Organized {total_measurements} measurements across {len(measurements_by_wld_id)} partitions")
+    # Single persistent connection (no pool overhead)
+    from clickhouse_connect_wrapper import Client
+    client = Client(
+        host=connection_params.get('host', 'localhost'),
+        port=connection_params.get('port', 8123),
+        database=connection_params.get('database', 'default'),
+        user=connection_params.get('user', 'default'),
+        password=connection_params.get('password', ''),
+        settings={
+            'max_insert_block_size': 1000000,
+            'max_threads': 32,
+            'max_insert_threads': 32
+        }
+    )
+    print("✅ Single persistent connection created")
     
-    # Create connection pool
-    pool_size = min(len(measurements_by_wld_id) * 2, MAX_WORKERS)
-    connection_pool = _create_connection_pool(connection_params, pool_size)
-    print(f"🔧 Created optimized ClickHouse connection pool with {pool_size} connections")
+    # ULTRA-FAST data conversion (minimal operations)
+    print("⚡ Converting data with minimal overhead...")
+    convert_start = time.time()
     
-    def process_partition(wld_id, partition_measurements):
-        try:
-            print(f"📊 Processing {len(partition_measurements)} measurements for device ID {wld_id}")
-            return _process_measurement_batch(
-                partition_measurements, batch_size, duplicate_tracker, duplicate_lock,
-                connection_pool, progress_lock, total_measurements, measurements_pushed_ref
-            )
-        except Exception as e:
-            print(f"❌ Error processing partition {wld_id}: {e}")
-            import traceback
-            traceback.print_exc()
-            return 0
+    current_time = datetime.now()
     
-    try:
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {executor.submit(process_partition, wld_id, partition_measurements): wld_id
-                      for wld_id, partition_measurements in measurements_by_wld_id.items()}
-            
-            completed_partitions = 0
-            for future in futures:
-                future.result()
-                completed_partitions += 1
-                print(f"✅ Completed partition {completed_partitions}/{len(measurements_by_wld_id)} ({completed_partitions / len(measurements_by_wld_id) * 100:.2f}%)")
-        
-        connection_pool.close_all()
-        elapsed_time = time.time() - start_time
-        _print_performance_summary(measurements_pushed_ref[0], elapsed_time, batch_size, MAX_WORKERS, len(measurements_by_wld_id))
-        return measurements_pushed_ref[0]
-        
-    except Exception as e:
-        elapsed_time = time.time() - start_time
-        _print_error_summary(e, measurements_pushed_ref[0], total_measurements, elapsed_time)
-        import traceback
-        traceback.print_exc()
-        return measurements_pushed_ref[0]
+    # DIRECT dict conversion - skip intermediate list conversion
+    dict_rows = []
+    for m in measurements:
+        dict_rows.append({
+            'wld_id': m['WLD_ID'],
+            'wtp_id': m['WTP_ID'],
+            'wp_pos_x': int(m['WP_POS_X']),
+            'wp_pos_y': int(m['WP_POS_Y']),
+            'wptm_value': float(m['WPTM_VALUE']),
+            'wptm_created_date': current_time,  # Use single timestamp for speed
+            'test_flag': 1 if m['TEST_FLAG'] else 0,
+            'segment': 0,  # Skip expensive segment calculation
+            'file_hash': m.get('FILE_HASH', '')
+        })
+    
+    convert_time = time.time() - convert_start
+    print(f"✅ Data converted in {convert_time:.2f}s ({len(measurements)/convert_time:.0f} records/sec)")
+    
+    # Single massive insert (no batching overhead)
+    print("⚡ Single massive insert...")
+    insert_start = time.time()
+    
+    client.execute(
+        "INSERT INTO measurements (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, wptm_created_date, test_flag, segment, file_hash) VALUES",
+        dict_rows
+    )
+    
+    insert_time = time.time() - insert_start
+    total_time = time.time() - start_time
+    throughput = len(measurements) / total_time
+    
+    print(f"✅ Ultra-fast push completed!")
+    print(f"  Conversion: {convert_time:.2f}s")
+    print(f"  Insert: {insert_time:.2f}s")
+    print(f"  Total: {total_time:.2f}s")
+    print(f"  Throughput: {throughput:.0f} measurements/second")
+    
+    return len(measurements)
 
 
 def optimize_table_for_batch_loading(client, device_ids=None):

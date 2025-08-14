@@ -136,24 +136,11 @@ class ClickHouseConnectWrapper:
             raise ValueError(f"Could not extract table name from query: {query}")
         
         try:
-            # Convert data format for clickhouse-connect
-            # clickhouse-connect expects list of lists, not list of dicts
+            # FASTEST: Minimize data conversion overhead
             columns = list(data[0].keys()) if data else []
             
-            # Convert data to list of lists format
-            rows = []
-            for record in data:
-                row = []
-                for col in columns:
-                    value = record.get(col)
-                    # Handle datetime objects
-                    if isinstance(value, datetime):
-                        row.append(value)
-                    elif value is None:
-                        row.append(None)
-                    else:
-                        row.append(value)
-                rows.append(row)
+            # Use list comprehension (much faster than nested loops)
+            rows = [[record[col] for col in columns] for record in data]
             
             # Insert data using clickhouse-connect
             self.client.insert(table_name, rows, column_names=columns, settings=settings)
