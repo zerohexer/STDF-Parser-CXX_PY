@@ -217,17 +217,8 @@ template<>
 std::string field_to_string<char*>(char* const& value) {
     if (value == nullptr) return "";
     
-    // STDF strings: First byte is length, actual string starts at value+1
-    // But some strings might be regular C strings, so we need to detect
-    unsigned char len = (unsigned char)value[0];
-    size_t actual_len = strlen(value + 1);
-    
-    // If first byte looks like a length byte and matches actual string length
-    if (len > 0 && len <= actual_len + 1 && len < 256) {
-        return std::string(value + 1);  // Skip STDF length byte
-    }
-    
-    // Otherwise treat as regular C string
+    // libstdf already processes the raw STDF strings and provides standard,
+    // null-terminated C-strings. No need to re-process or skip length bytes.
     return std::string(value);
 }
 

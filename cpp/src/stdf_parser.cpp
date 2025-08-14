@@ -401,12 +401,12 @@ STDFRecord STDFParser::parse_mpr_record(void* mpr_rec) {
             
             // Optional: Extract text fields
             if (mpr->TEST_TXT) {
-                record.fields["test_txt"] = std::string(mpr->TEST_TXT + 1);  // Skip length byte
-                record.test_txt = record.fields["test_txt"];
+                record.fields["TEST_TXT"] = std::string(mpr->TEST_TXT + 1);  // Skip length byte
+                record.test_txt = record.fields["TEST_TXT"];
             }
             if (mpr->ALARM_ID) {
-                record.fields["alarm_id"] = std::string(mpr->ALARM_ID + 1);  // Skip length byte
-                record.alarm_id = record.fields["alarm_id"];
+                record.fields["ALARM_ID"] = std::string(mpr->ALARM_ID + 1);  // Skip length byte
+                record.alarm_id = record.fields["ALARM_ID"];
             }
             
             // Extract additional MPR-specific fields
@@ -680,10 +680,10 @@ STDFRecord STDFParser::parse_prr_record(void* prr_rec) {
             
             // Optional: Extract text fields
             if (prr->PART_ID) {
-                record.fields["part_id"] = std::string(prr->PART_ID + 1);  // Skip length byte
+                record.fields["PART_ID"] = std::string(prr->PART_ID + 1);  // Skip length byte
             }
             if (prr->PART_TXT) {
-                record.fields["part_txt"] = std::string(prr->PART_TXT + 1);  // Skip length byte
+                record.fields["PART_TXT"] = std::string(prr->PART_TXT + 1);  // Skip length byte
             }
             
             // Extract binary field
