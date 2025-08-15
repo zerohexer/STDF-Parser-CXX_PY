@@ -196,49 +196,118 @@ class STDFProcessor:
         
         return False
     
-    def extract_measurements(self, stdf_file_path):
-        """Extract ALL measurements from STDF file using C++ parser"""
+    def _load_existing_mappings_from_clickhouse(self, host='localhost', port=9000, database='default', user='default', password=''):
+        """Load existing device and parameter mappings from ClickHouse"""
+        try:
+            from clickhouse_driver import Client
+            
+            # Use provided parameters or stored settings
+            actual_host = host if host != 'localhost' else getattr(self, 'ch_host', 'localhost')
+            actual_port = port if port != 9000 else getattr(self, 'ch_port', 9000)
+            actual_database = database if database != 'default' else getattr(self, 'ch_database', 'default')
+            actual_user = user if user != 'default' else getattr(self, 'ch_user', 'default')
+            actual_password = password if password != '' else getattr(self, 'ch_password', '')
+            
+            # Create connection to load mappings
+            client = Client(
+                host=actual_host,
+                port=actual_port,
+                database=actual_database,
+                user=actual_user,
+                password=actual_password
+            )
+            
+            # Load device mappings
+            device_mappings = []
+            try:
+                device_results = client.execute("SELECT wld_device_dmc, wld_id FROM device_mapping")
+                device_mappings = [(device_dmc, device_id) for device_dmc, device_id in device_results]
+                print(f"📊 Loaded {len(device_mappings)} existing device mappings")
+            except Exception as e:
+                print(f"⚠️ No existing device mappings found: {e}")
+                device_mappings = []
+            
+            # Load parameter mappings
+            param_mappings = []
+            try:
+                param_results = client.execute("SELECT wtp_param_name, wtp_id FROM parameter_info")
+                param_mappings = [(param_name, param_id) for param_name, param_id in param_results]
+                print(f"📊 Loaded {len(param_mappings)} existing parameter mappings")
+            except Exception as e:
+                print(f"⚠️ No existing parameter mappings found: {e}")
+                param_mappings = []
+            
+            return device_mappings, param_mappings
+            
+        except Exception as e:
+            print(f"⚠️ Error loading existing mappings: {e}")
+            return [], []
+    
+    def extract_measurements(self, stdf_file_path, ch_host='localhost', ch_port=9000, ch_database='default', ch_user='default', ch_password=''):
+        """Extract ALL measurements from STDF file using DATABASE-AWARE C++ processing"""
         print(f"\n📄 Processing: {os.path.basename(stdf_file_path)}")
         
         start_time = time.time()
         
-        # Parse with C++ - get ALL records with ALL fields
-        result = stdf_parser_cpp.parse_stdf_file(stdf_file_path)
-        records = result.get('records', [])
+        # 🔧 DATABASE-AWARE: Load existing mappings from ClickHouse first
+        print(f"🔧 Loading existing device/parameter mappings from ClickHouse...")
+        device_mappings, param_mappings = self._load_existing_mappings_from_clickhouse(
+            host=ch_host, port=ch_port, database=ch_database, user=ch_user, password=ch_password
+        )
         
-        cpp_time = time.time() - start_time
-        print(f"⚡ C++ parsed {len(records):,} records in {cpp_time:.2f}s")
+        # 🚀 ULTRA-FAST: Process STDF with database-aware IDs
+        result = stdf_parser_cpp.process_stdf_with_database_mappings(
+            stdf_file_path, 
+            device_mappings, 
+            param_mappings
+        )
         
-        # Group records by type
-        record_types = {}
-        for record in records:
-            rtype = record.get('record_type', 'UNKNOWN')
-            if rtype not in record_types:
-                record_types[rtype] = []
-            record_types[rtype].append(record)
-        
-        print(f"📊 Record types: {list(record_types.keys())}")
-        
-        # Extract measurements from test records (same logic as original)
-        measurement_start = time.time()
-        self._extract_from_records(record_types)
-        measurement_time = time.time() - measurement_start
+        # Extract results from C++ processing
+        measurement_tuples = result.get('measurement_tuples', [])
+        new_device_mappings = result.get('new_device_mappings', [])
+        new_param_mappings = result.get('new_param_mappings', [])
         
         total_time = time.time() - start_time
-        print(f"🎯 Extracted {len(self.measurements):,} measurements in {measurement_time:.2f}s")
-        print(f"⏱️ Total parsing time: {total_time:.2f}s")
+        
+        print(f"🚀 ULTRA-FAST C++ processing completed:")
+        print(f"   📊 Records parsed: {result.get('total_records', 0):,}")
+        print(f"   📊 Measurements: {result.get('total_measurements', 0):,}")
+        print(f"   ⏱️ C++ parsing: {result.get('parsing_time', 0):.2f}s")
+        print(f"   ⏱️ C++ processing: {result.get('processing_time', 0):.2f}s")
+        print(f"   ⏱️ Total time: {total_time:.2f}s")
+        
+        if total_time > 0:
+            throughput = len(measurement_tuples) / total_time
+            print(f"   🚀 Throughput: {throughput:.0f} measurements/second")
+        
+        # Store tuples for ClickHouse insertion
+        self.measurement_tuples = measurement_tuples
+        
+        # Update ID mappings from C++ results (includes both existing + new)
+        total_devices = len(device_mappings) + len(new_device_mappings)
+        total_params = len(param_mappings) + len(new_param_mappings)
+        
+        # Store new mappings for database insertion
+        self.new_device_mappings = new_device_mappings
+        self.new_param_mappings = new_param_mappings
+        
+        print(f"   📊 Total device mappings: {total_devices:,} ({len(device_mappings):,} existing + {len(new_device_mappings):,} new)")
+        print(f"   📊 Total parameter mappings: {total_params:,} ({len(param_mappings):,} existing + {len(new_param_mappings):,} new)")
         
         # Store processing stats
         self.processing_stats = {
-            'cpp_parsing_time': cpp_time,
-            'measurement_extraction_time': measurement_time,
-            'total_parsing_time': total_time,
-            'total_measurements': len(self.measurements),
-            'total_records': len(records),
-            'record_types': list(record_types.keys())
+            'cpp_parsing_time': result.get('parsing_time', 0),
+            'cpp_processing_time': result.get('processing_time', 0),
+            'total_processing_time': total_time,
+            'total_measurements': len(measurement_tuples),
+            'total_records': result.get('total_records', 0),
+            'ultra_fast_mode': True
         }
         
-        return self.measurements
+        # For compatibility, also store as measurements list (but empty to save memory)
+        self.measurements = []
+        
+        return measurement_tuples
     
     def _extract_from_records(self, record_types):
         """Extract measurements from parsed records using OPTIMIZED CROSS-PRODUCT logic + FIXED ID mapping"""
@@ -509,11 +578,22 @@ class STDFProcessor:
             user: Username for authentication
             password: Password for authentication
         """
+        # Store ClickHouse connection parameters for later use
+        self.ch_host = host
+        self.ch_port = port
+        self.ch_database = database
+        self.ch_user = user
+        self.ch_password = password
+        
         if not self.enable_clickhouse:
             print("⚠️ ClickHouse integration is disabled")
             return False
         
-        if not self.measurements:
+        # Check for measurements in either format (tuples or list)
+        has_measurements = (hasattr(self, 'measurement_tuples') and self.measurement_tuples) or \
+                          (hasattr(self, 'measurements') and self.measurements)
+        
+        if not has_measurements:
             print("⚠️ No measurements to push")
             return False
         
@@ -521,53 +601,92 @@ class STDFProcessor:
         clickhouse_start = time.time()
         
         try:
-            # Step 1: Use C++ measurements directly (skip slow transformation)
-            print(f"🚀 Using C++ measurements directly (skipping transformation)...")
-            transform_time = 0.0  # No transformation time since we skip it
-            
-            # Fix DateTime fields - convert strings to datetime objects
-            from datetime import datetime
-            current_time = datetime.now()
-            
-            # Fix measurements with proper DateTime objects and add segment field
-            fixed_measurements = []
-            duplicate_tracker = {}  # Track duplicates like STDF_Parser_CH.py
-            
-            for measurement in self.measurements:
-                fixed_measurement = measurement.copy()
+            # Check if we have ultra-fast tuples or need to process old format
+            if hasattr(self, 'measurement_tuples') and self.measurement_tuples:
+                print(f"🚀 Using ULTRA-FAST C++ tuples (no transformation needed)...")
+                transform_time = 0.0  # No transformation needed!
                 
-                # Convert string timestamps to datetime objects for ClickHouse
-                if 'WPTM_CREATED_DATE' in fixed_measurement:
-                    fixed_measurement['WPTM_CREATED_DATE'] = current_time
-                if 'WLD_CREATED_DATE' in fixed_measurement:
-                    fixed_measurement['WLD_CREATED_DATE'] = current_time
+                # Convert tuples to ClickHouse format with datetime
+                from datetime import datetime
+                current_time = datetime.now()
                 
-                # Add segment field for deduplication (like STDF_Parser_CH.py)
-                # Create duplicate key based on device + parameter + coordinates + test_flag (like clickhouse_utils.py line 768)
-                duplicate_key = (
-                    fixed_measurement.get('WLD_ID', 0),
-                    fixed_measurement.get('WTP_ID', 0), 
-                    str(fixed_measurement.get('WP_POS_X', 0)),  # Convert to string like original
-                    str(fixed_measurement.get('WP_POS_Y', 0)),  # Convert to string like original
-                    fixed_measurement.get('TEST_FLG', 0)        # Add TEST_FLG (raw STDF flag) for deduplication
-                )
+                # Ultra-fast tuple conversion (already optimized in C++)
+                clickhouse_tuples = []
+                for tuple_data in self.measurement_tuples:
+                    # 🚀 MACRO-DRIVEN: Unpack all fields automatically
+                    # C++ macros ensure this matches the field count exactly
+                    (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, test_flag, segment, file_hash,
+                     wld_device_dmc, wtp_param_name, units, test_num, test_flg) = tuple_data
+                    
+                    clickhouse_tuples.append((
+                        wld_id,
+                        wtp_id, 
+                        wp_pos_x,
+                        wp_pos_y,
+                        wptm_value,
+                        current_time,  # ClickHouse datetime
+                        test_flag,
+                        segment,
+                        file_hash
+                    ))
                 
-                # Get segment number (0 for first occurrence, increment for duplicates)
-                if duplicate_key in duplicate_tracker:
-                    segment = duplicate_tracker[duplicate_key] + 1
-                    duplicate_tracker[duplicate_key] = segment
-                else:
-                    segment = 0
-                    duplicate_tracker[duplicate_key] = 0
+                # Create ultra-fast data store
+                data_store = {
+                    'measurement_tuples': clickhouse_tuples,
+                    'measurements': [],  # Empty to save memory
+                    'landing_records': []
+                }
                 
-                fixed_measurement['segment'] = segment
-                fixed_measurements.append(fixed_measurement)
-            
-            # Create a simple data store using fixed C++ measurements
-            data_store = {
-                'measurements': fixed_measurements,
-                'landing_records': []  # Empty for now
-            }
+                print(f"✅ Ultra-fast tuple conversion: {len(clickhouse_tuples):,} tuples ready for ClickHouse")
+                
+            else:
+                # Fallback to old format processing
+                print(f"🚀 Using C++ measurements directly (skipping transformation)...")
+                transform_time = 0.0  # No transformation time since we skip it
+                
+                # Fix DateTime fields - convert strings to datetime objects
+                from datetime import datetime
+                current_time = datetime.now()
+                
+                # Fix measurements with proper DateTime objects and add segment field
+                fixed_measurements = []
+                duplicate_tracker = {}  # Track duplicates like STDF_Parser_CH.py
+                
+                for measurement in self.measurements:
+                    fixed_measurement = measurement.copy()
+                    
+                    # Convert string timestamps to datetime objects for ClickHouse
+                    if 'WPTM_CREATED_DATE' in fixed_measurement:
+                        fixed_measurement['WPTM_CREATED_DATE'] = current_time
+                    if 'WLD_CREATED_DATE' in fixed_measurement:
+                        fixed_measurement['WLD_CREATED_DATE'] = current_time
+                    
+                    # Add segment field for deduplication (like STDF_Parser_CH.py)
+                    # Create duplicate key based on device + parameter + coordinates + test_flag (like clickhouse_utils.py line 768)
+                    duplicate_key = (
+                        fixed_measurement.get('WLD_ID', 0),
+                        fixed_measurement.get('WTP_ID', 0), 
+                        str(fixed_measurement.get('WP_POS_X', 0)),  # Convert to string like original
+                        str(fixed_measurement.get('WP_POS_Y', 0)),  # Convert to string like original
+                        fixed_measurement.get('TEST_FLG', 0)        # Add TEST_FLG (raw STDF flag) for deduplication
+                    )
+                    
+                    # Get segment number (0 for first occurrence, increment for duplicates)
+                    if duplicate_key in duplicate_tracker:
+                        segment = duplicate_tracker[duplicate_key] + 1
+                        duplicate_tracker[duplicate_key] = segment
+                    else:
+                        segment = 0
+                        duplicate_tracker[duplicate_key] = 0
+                    
+                    fixed_measurement['segment'] = segment
+                    fixed_measurements.append(fixed_measurement)
+                
+                # Create a simple data store using fixed C++ measurements
+                data_store = {
+                    'measurements': fixed_measurements,
+                    'landing_records': []  # Empty for now
+                }
             
             # Create a simple extractor-like object that mimics STDF_Parser_CH.py interface
             class SimpleExtractorLike:
@@ -714,7 +833,9 @@ class STDFProcessor:
                     self.device_id_map = self.processor.device_id_map
                     self.param_id_map = self.processor.param_id_map
                             
-            extractor_like = SimpleExtractorLike(data_store, fixed_measurements, self)
+            # Use appropriate measurements based on processing mode
+            measurements_ref = data_store.get('measurement_tuples', data_store.get('measurements', []))
+            extractor_like = SimpleExtractorLike(data_store, measurements_ref, self)
             
             # Step 2: Setup ClickHouse connection and schema
             print(f"🔧 Setting up ClickHouse connection and schema...")
@@ -767,15 +888,27 @@ class STDFProcessor:
             print(f"📊 Pushing data to ClickHouse...")
             push_start = time.time()
             
-            success = push_to_clickhouse(
-                extractor_like,
-                host=host,
-                port=port,
-                database=database,
-                user=user,
-                password=password,
-                batch_size=self.batch_size
-            )
+            # Use ultra-fast direct push if we have tuples
+            if hasattr(self, 'measurement_tuples') and self.measurement_tuples:
+                success = self._push_tuples_to_clickhouse_ultra_fast(
+                    data_store['measurement_tuples'],
+                    host=host,
+                    port=port,
+                    database=database,
+                    user=user,
+                    password=password
+                )
+            else:
+                # Fallback to standard push method
+                success = push_to_clickhouse(
+                    extractor_like,
+                    host=host,
+                    port=port,
+                    database=database,
+                    user=user,
+                    password=password,
+                    batch_size=self.batch_size
+                )
             
             push_time = time.time() - push_start
             total_clickhouse_time = time.time() - clickhouse_start
@@ -801,6 +934,81 @@ class STDFProcessor:
             
         except Exception as e:
             print(f"❌ Error in ClickHouse integration: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def _push_tuples_to_clickhouse_ultra_fast(self, tuples, host, port, database, user, password):
+        """🚀 ULTRA-FAST: Push pre-processed tuples directly to ClickHouse"""
+        try:
+            from clickhouse_driver import Client
+            
+            print(f"🚀 Ultra-fast ClickHouse push: {len(tuples):,} tuples")
+            start_time = time.time()
+            
+            # Create optimized connection
+            client = Client(
+                host=host,
+                port=port,
+                database=database,
+                user=user,
+                password=password,
+                settings={
+                    'max_insert_block_size': 1000000,
+                    'max_threads': 16,
+                    'max_insert_threads': 16,
+                    'receive_timeout': 300,
+                    'send_timeout': 300
+                }
+            )
+            
+            # Setup schema first
+            setup_clickhouse_schema(client)
+            
+            # Push only NEW device and parameter mappings
+            if hasattr(self, 'new_device_mappings') and self.new_device_mappings:
+                device_insert_data = [(device_id, device_dmc) for device_dmc, device_id in self.new_device_mappings]
+                client.execute(
+                    "INSERT INTO device_mapping (wld_id, wld_device_dmc) VALUES",
+                    device_insert_data
+                )
+                print(f"✅ Pushed {len(device_insert_data)} NEW device mappings")
+            else:
+                print(f"ℹ️ No new device mappings to insert")
+            
+            if hasattr(self, 'new_param_mappings') and self.new_param_mappings:
+                param_insert_data = [(param_id, param_name) for param_name, param_id in self.new_param_mappings]
+                client.execute(
+                    "INSERT INTO parameter_info (wtp_id, wtp_param_name) VALUES", 
+                    param_insert_data
+                )
+                print(f"✅ Pushed {len(param_insert_data)} NEW parameter mappings")
+            else:
+                print(f"ℹ️ No new parameter mappings to insert")
+            
+            # Ultra-fast single insert for all measurements
+            print(f"🚀 Inserting {len(tuples):,} measurements in single operation...")
+            insert_start = time.time()
+            
+            client.execute(
+                "INSERT INTO measurements (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, wptm_created_date, test_flag, segment, file_hash) VALUES",
+                tuples
+            )
+            
+            insert_time = time.time() - insert_start
+            total_time = time.time() - start_time
+            throughput = len(tuples) / total_time if total_time > 0 else 0
+            
+            print(f"✅ ULTRA-FAST ClickHouse push completed!")
+            print(f"   📊 Measurements pushed: {len(tuples):,}")
+            print(f"   ⏱️ Insert time: {insert_time:.2f}s")
+            print(f"   ⏱️ Total time: {total_time:.2f}s") 
+            print(f"   🚀 Throughput: {throughput:.0f} measurements/second")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error in ultra-fast ClickHouse push: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -895,8 +1103,15 @@ def main():
                 batch_size=args.batch_size
             )
             
-            # Extract measurements
-            measurements = processor.extract_measurements(stdf_file)
+            # Extract measurements with ClickHouse connection parameters
+            measurements = processor.extract_measurements(
+                stdf_file,
+                ch_host=args.ch_host,
+                ch_port=args.ch_port,
+                ch_database=args.ch_database,
+                ch_user=args.ch_user,
+                ch_password=args.ch_password
+            )
             overall_measurements += len(measurements)
             
             # Push to ClickHouse if requested

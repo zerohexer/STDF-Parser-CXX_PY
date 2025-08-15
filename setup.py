@@ -11,6 +11,7 @@ stdf_parser_extension = Extension(
     sources=[
         'cpp/src/stdf_parser.cpp',
         'cpp/src/dynamic_field_extractor.cpp',
+        'cpp/src/ultra_fast_processor.cpp',
         'cpp/src/python_bridge.cpp'
     ],
     include_dirs=[

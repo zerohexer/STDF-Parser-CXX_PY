@@ -1,6 +1,7 @@
 #include <Python.h>
 #include "../include/stdf_parser.h"
 #include "../include/dynamic_field_extractor.h"
+#include "../include/ultra_fast_processor.h"
 #include <iostream>
 #include <vector>
 
@@ -185,7 +186,259 @@ static PyObject* precompute_measurement_fields(PyObject* self, PyObject* args) {
     return computed_fields;
 }
 
+// 🚀 ULTRA-FAST: Process STDF to ClickHouse tuples entirely in C++
+static PyObject* process_stdf_to_clickhouse_tuples(PyObject* self, PyObject* args) {
+    const char* filepath;
+    
+    // Parse arguments
+    if (!PyArg_ParseTuple(args, "s", &filepath)) {
+        return nullptr;
+    }
+    
+    try {
+        // Create ultra-fast processor
+        UltraFastProcessor processor;
+        
+        // Process STDF file entirely in C++
+        std::vector<MeasurementTuple> measurements = processor.process_stdf_file(std::string(filepath));
+        
+        // Convert ONLY final measurements to Python tuples (minimal bridge)
+        PyObject* tuple_list = PyList_New(measurements.size());
+        if (!tuple_list) {
+            return nullptr;
+        }
+        
+        // Helper function for safe string conversion
+        auto PyUnicode_FromString_Safe = [](const std::string& str) -> PyObject* {
+            return PyUnicode_FromString(str.c_str());
+        };
+        
+        // 🚀 MACRO-DRIVEN: Calculate tuple size automatically
+        constexpr size_t TUPLE_SIZE = 0
+        #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) + 1
+        #include "../include/measurement_fields.def"
+        #undef MEASUREMENT_FIELD
+        ;
+        
+        for (size_t i = 0; i < measurements.size(); ++i) {
+            const auto& m = measurements[i];
+            
+            // Create ClickHouse-compatible tuple with auto-calculated size
+            PyObject* tuple = PyTuple_New(TUPLE_SIZE);
+            if (!tuple) {
+                Py_DECREF(tuple_list);
+                return nullptr;
+            }
+            
+            // 🚀 MACRO-DRIVEN: Pack measurement data using macro expansion
+            size_t field_index = 0;
+            #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
+                PyTuple_SetItem(tuple, field_index++, python_conversion(m.name));
+            
+            #include "../include/measurement_fields.def"
+            #undef MEASUREMENT_FIELD
+            
+            PyList_SetItem(tuple_list, i, tuple);
+        }
+        
+        // Create result dictionary with tuples and statistics
+        PyObject* result_dict = PyDict_New();
+        if (!result_dict) {
+            Py_DECREF(tuple_list);
+            return nullptr;
+        }
+        
+        PyDict_SetItemString(result_dict, "measurement_tuples", tuple_list);
+        PyDict_SetItemString(result_dict, "total_records", 
+                           PyLong_FromSize_t(processor.get_total_records()));
+        PyDict_SetItemString(result_dict, "total_measurements", 
+                           PyLong_FromSize_t(processor.get_processed_measurements()));
+        PyDict_SetItemString(result_dict, "parsing_time", 
+                           PyFloat_FromDouble(processor.get_parsing_time()));
+        PyDict_SetItemString(result_dict, "processing_time", 
+                           PyFloat_FromDouble(processor.get_processing_time()));
+        
+        // Add ID mappings for database insertion
+        const auto& id_manager = processor.get_id_manager();
+        const auto& device_map = id_manager.get_device_map();
+        const auto& param_map = id_manager.get_param_map();
+        
+        PyObject* device_mappings = PyList_New(device_map.size());
+        size_t idx = 0;
+        for (const auto& pair : device_map) {
+            PyObject* mapping = PyTuple_New(2);
+            PyTuple_SetItem(mapping, 0, PyLong_FromUnsignedLong(pair.second)); // wld_id
+            PyTuple_SetItem(mapping, 1, PyUnicode_FromString(pair.first.c_str())); // device_dmc
+            PyList_SetItem(device_mappings, idx++, mapping);
+        }
+        PyDict_SetItemString(result_dict, "device_mappings", device_mappings);
+        
+        PyObject* param_mappings = PyList_New(param_map.size());
+        idx = 0;
+        for (const auto& pair : param_map) {
+            PyObject* mapping = PyTuple_New(2);
+            PyTuple_SetItem(mapping, 0, PyLong_FromUnsignedLong(pair.second)); // wtp_id
+            PyTuple_SetItem(mapping, 1, PyUnicode_FromString(pair.first.c_str())); // param_name
+            PyList_SetItem(param_mappings, idx++, mapping);
+        }
+        PyDict_SetItemString(result_dict, "param_mappings", param_mappings);
+        
+        return result_dict;
+        
+    } catch (const std::exception& e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return nullptr;
+    }
+}
 
+// 🔧 DATABASE-AWARE: Process STDF with existing database mappings
+static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* args) {
+    const char* filepath;
+    PyObject* device_mappings_list;
+    PyObject* param_mappings_list;
+    
+    // Parse arguments: filepath, device_mappings, param_mappings
+    if (!PyArg_ParseTuple(args, "sOO", &filepath, &device_mappings_list, &param_mappings_list)) {
+        return nullptr;
+    }
+    
+    try {
+        // Create ultra-fast processor
+        UltraFastProcessor processor;
+        
+        // Convert Python lists to C++ vectors
+        std::vector<std::pair<std::string, uint32_t>> device_mappings;
+        std::vector<std::pair<std::string, uint32_t>> param_mappings;
+        
+        // Parse device mappings
+        if (PyList_Check(device_mappings_list)) {
+            Py_ssize_t size = PyList_Size(device_mappings_list);
+            for (Py_ssize_t i = 0; i < size; ++i) {
+                PyObject* tuple = PyList_GetItem(device_mappings_list, i);
+                if (PyTuple_Check(tuple) && PyTuple_Size(tuple) == 2) {
+                    PyObject* device_name = PyTuple_GetItem(tuple, 0);
+                    PyObject* device_id = PyTuple_GetItem(tuple, 1);
+                    
+                    if (PyUnicode_Check(device_name) && PyLong_Check(device_id)) {
+                        const char* name = PyUnicode_AsUTF8(device_name);
+                        uint32_t id = static_cast<uint32_t>(PyLong_AsUnsignedLong(device_id));
+                        device_mappings.emplace_back(name, id);
+                    }
+                }
+            }
+        }
+        
+        // Parse parameter mappings
+        if (PyList_Check(param_mappings_list)) {
+            Py_ssize_t size = PyList_Size(param_mappings_list);
+            for (Py_ssize_t i = 0; i < size; ++i) {
+                PyObject* tuple = PyList_GetItem(param_mappings_list, i);
+                if (PyTuple_Check(tuple) && PyTuple_Size(tuple) == 2) {
+                    PyObject* param_name = PyTuple_GetItem(tuple, 0);
+                    PyObject* param_id = PyTuple_GetItem(tuple, 1);
+                    
+                    if (PyUnicode_Check(param_name) && PyLong_Check(param_id)) {
+                        const char* name = PyUnicode_AsUTF8(param_name);
+                        uint32_t id = static_cast<uint32_t>(PyLong_AsUnsignedLong(param_id));
+                        param_mappings.emplace_back(name, id);
+                    }
+                }
+            }
+        }
+        
+        std::cout << "🔧 Loading " << device_mappings.size() << " device mappings, " 
+                  << param_mappings.size() << " parameter mappings from database" << std::endl;
+        
+        // Load existing mappings into processor
+        auto& id_manager = const_cast<FastIDManager&>(processor.get_id_manager());
+        id_manager.load_existing_mappings_from_python(device_mappings, param_mappings);
+        
+        // Process STDF file with database-aware IDs
+        std::vector<MeasurementTuple> measurements = processor.process_stdf_file(std::string(filepath));
+        
+        // Convert measurements to Python tuples (reuse existing code)
+        auto PyUnicode_FromString_Safe = [](const std::string& str) -> PyObject* {
+            return PyUnicode_FromString(str.c_str());
+        };
+        
+        constexpr size_t TUPLE_SIZE = 0
+        #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) + 1
+        #include "../include/measurement_fields.def"
+        #undef MEASUREMENT_FIELD
+        ;
+        
+        PyObject* tuple_list = PyList_New(measurements.size());
+        if (!tuple_list) return nullptr;
+        
+        for (size_t i = 0; i < measurements.size(); ++i) {
+            const auto& m = measurements[i];
+            
+            PyObject* tuple = PyTuple_New(TUPLE_SIZE);
+            if (!tuple) {
+                Py_DECREF(tuple_list);
+                return nullptr;
+            }
+            
+            size_t field_index = 0;
+            #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
+                PyTuple_SetItem(tuple, field_index++, python_conversion(m.name));
+            
+            #include "../include/measurement_fields.def"
+            #undef MEASUREMENT_FIELD
+            
+            PyList_SetItem(tuple_list, i, tuple);
+        }
+        
+        // Get only new mappings for database insertion
+        auto new_device_mappings = id_manager.get_new_device_mappings();
+        auto new_param_mappings = id_manager.get_new_param_mappings();
+        
+        std::cout << "🆕 Found " << new_device_mappings.size() << " new devices, " 
+                  << new_param_mappings.size() << " new parameters to insert" << std::endl;
+        
+        // Create result dictionary
+        PyObject* result_dict = PyDict_New();
+        if (!result_dict) {
+            Py_DECREF(tuple_list);
+            return nullptr;
+        }
+        
+        PyDict_SetItemString(result_dict, "measurement_tuples", tuple_list);
+        PyDict_SetItemString(result_dict, "total_records", 
+                           PyLong_FromSize_t(processor.get_total_records()));
+        PyDict_SetItemString(result_dict, "total_measurements", 
+                           PyLong_FromSize_t(processor.get_processed_measurements()));
+        PyDict_SetItemString(result_dict, "parsing_time", 
+                           PyFloat_FromDouble(processor.get_parsing_time()));
+        PyDict_SetItemString(result_dict, "processing_time", 
+                           PyFloat_FromDouble(processor.get_processing_time()));
+        
+        // Add only NEW mappings for database insertion
+        PyObject* new_device_list = PyList_New(new_device_mappings.size());
+        for (size_t i = 0; i < new_device_mappings.size(); ++i) {
+            PyObject* mapping = PyTuple_New(2);
+            PyTuple_SetItem(mapping, 0, PyUnicode_FromString(new_device_mappings[i].first.c_str()));
+            PyTuple_SetItem(mapping, 1, PyLong_FromUnsignedLong(new_device_mappings[i].second));
+            PyList_SetItem(new_device_list, i, mapping);
+        }
+        PyDict_SetItemString(result_dict, "new_device_mappings", new_device_list);
+        
+        PyObject* new_param_list = PyList_New(new_param_mappings.size());
+        for (size_t i = 0; i < new_param_mappings.size(); ++i) {
+            PyObject* mapping = PyTuple_New(2);
+            PyTuple_SetItem(mapping, 0, PyUnicode_FromString(new_param_mappings[i].first.c_str()));
+            PyTuple_SetItem(mapping, 1, PyLong_FromUnsignedLong(new_param_mappings[i].second));
+            PyList_SetItem(new_param_list, i, mapping);
+        }
+        PyDict_SetItemString(result_dict, "new_param_mappings", new_param_list);
+        
+        return result_dict;
+        
+    } catch (const std::exception& e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return nullptr;
+    }
+}
 
 // Method definitions
 static PyMethodDef StdfParserMethods[] = {
@@ -193,6 +446,10 @@ static PyMethodDef StdfParserMethods[] = {
      "Parse STDF file and return list of records"},
     {"precompute_measurement_fields", precompute_measurement_fields, METH_VARARGS,
      "Pre-compute expensive measurement fields in C++"},
+    {"process_stdf_to_clickhouse_tuples", process_stdf_to_clickhouse_tuples, METH_VARARGS,
+     "🚀 ULTRA-FAST: Process STDF to ClickHouse tuples entirely in C++"},
+    {"process_stdf_with_database_mappings", process_stdf_with_database_mappings, METH_VARARGS,
+     "🔧 DATABASE-AWARE: Process STDF with existing database mappings"},
     {"get_version", get_version, METH_NOARGS,
      "Get version information"},
     {nullptr, nullptr, 0, nullptr}

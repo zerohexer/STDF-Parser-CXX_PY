@@ -24,7 +24,8 @@ if platform.system() == "Windows":
         'sources': [
             'cpp/src/python_bridge.cpp',
             'cpp/src/stdf_parser.cpp',
-            'cpp/src/dynamic_field_extractor.cpp'
+            'cpp/src/dynamic_field_extractor.cpp',
+            'cpp/src/ultra_fast_processor.cpp'
         ],
         'include_dirs': [
             'cpp/include',

@@ -1,0 +1,24 @@
+// Measurement Fields Definition using X-Macros
+// Add new fields here and they will automatically be included everywhere!
+//
+// Usage: MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type)
+
+// Core measurement fields
+MEASUREMENT_FIELD(wld_id,           uint32_t,    PyLong_FromUnsignedLong,     "UInt32")
+MEASUREMENT_FIELD(wtp_id,           uint32_t,    PyLong_FromUnsignedLong,     "UInt32") 
+MEASUREMENT_FIELD(wp_pos_x,         int32_t,     PyLong_FromLong,             "Int32")
+MEASUREMENT_FIELD(wp_pos_y,         int32_t,     PyLong_FromLong,             "Int32")
+MEASUREMENT_FIELD(wptm_value,       double,      PyFloat_FromDouble,          "Float64")
+MEASUREMENT_FIELD(test_flag,        uint8_t,     PyLong_FromUnsignedLong,     "UInt8")
+MEASUREMENT_FIELD(segment,          uint8_t,     PyLong_FromUnsignedLong,     "UInt8")
+MEASUREMENT_FIELD(file_hash,        std::string, PyUnicode_FromString_Safe,   "String")
+
+// Additional fields (easy to add new ones!)
+MEASUREMENT_FIELD(wld_device_dmc,   std::string, PyUnicode_FromString_Safe,   "String")
+MEASUREMENT_FIELD(wtp_param_name,   std::string, PyUnicode_FromString_Safe,   "String")
+MEASUREMENT_FIELD(units,            std::string, PyUnicode_FromString_Safe,   "String")
+MEASUREMENT_FIELD(test_num,         uint32_t,    PyLong_FromUnsignedLong,     "UInt32")
+MEASUREMENT_FIELD(test_flg,         uint8_t,     PyLong_FromUnsignedLong,     "UInt8")
+
+// Example: To add a new field, just add a line like this:
+// MEASUREMENT_FIELD(new_field_name,  std::string, PyUnicode_FromString_Safe,   "String")
