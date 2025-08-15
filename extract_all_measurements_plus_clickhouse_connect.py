@@ -249,17 +249,59 @@ class STDFProcessor:
         
         start_time = time.time()
         
-        # 🔧 DATABASE-AWARE: Load existing mappings from ClickHouse first
+        # 🔍 FILE HASH DEDUPLICATION CHECK - BEFORE expensive processing!
+        print(f"🔍 Checking file deduplication...")
+        file_hash = self._generate_file_hash(stdf_file_path)
+        if file_hash:
+            print(f"   📄 File hash: {file_hash}")
+            self.current_file_hash = file_hash
+            
+            # Create temporary ClickHouse connection to check for duplicates
+            try:
+                from clickhouse_driver import Client
+                temp_client = Client(
+                    host=ch_host,
+                    port=ch_port,
+                    database=ch_database,
+                    user=ch_user,
+                    password=ch_password
+                )
+                
+                if self._is_file_already_processed(file_hash, temp_client):
+                    filename = os.path.basename(stdf_file_path)
+                    print(f"⚠️ File {filename} already processed (hash: {file_hash})")
+                    print(f"⚠️ Skipping processing to prevent duplicates")
+                    # Return empty results to indicate file was skipped
+                    self.measurement_tuples = []
+                    self.new_device_mappings = []
+                    self.new_param_mappings = []
+                    self.processing_stats = {
+                        'skipped_duplicate': True,
+                        'file_hash': file_hash,
+                        'total_measurements': 0
+                    }
+                    return []
+                else:
+                    print(f"✅ File not previously processed, continuing...")
+            except Exception as e:
+                print(f"⚠️ Could not check for duplicates: {e}")
+                print(f"⚠️ Proceeding with processing...")
+        else:
+            print(f"⚠️ Could not generate file hash, proceeding without deduplication")
+        
+        # 🔧 DATABASE-AWARE: Load existing mappings from ClickHouse
         print(f"🔧 Loading existing device/parameter mappings from ClickHouse...")
         device_mappings, param_mappings = self._load_existing_mappings_from_clickhouse(
             host=ch_host, port=ch_port, database=ch_database, user=ch_user, password=ch_password
         )
         
         # 🚀 ULTRA-FAST: Process STDF with database-aware IDs
+        # Pass the Python-generated file hash to C++ to ensure consistency
         result = stdf_parser_cpp.process_stdf_with_database_mappings(
             stdf_file_path, 
             device_mappings, 
-            param_mappings
+            param_mappings,
+            self.current_file_hash or ""  # Pass the MD5 hash from Python
         )
         
         # Extract results from C++ processing
@@ -844,27 +886,8 @@ class STDFProcessor:
             client = optimize_clickhouse_connection(host, port, database, user, password)
             setup_clickhouse_schema(client)
             
-            # Step 2.1: Check for file deduplication
-            print(f"🔍 Checking file deduplication...")
-            file_hash = self._generate_file_hash(stdf_file_path)
-            if file_hash:
-                print(f"   📄 File hash: {file_hash}")
-                self.current_file_hash = file_hash
-                
-                if self._is_file_already_processed(file_hash, client):
-                    filename = os.path.basename(stdf_file_path)
-                    print(f"⚠️ File {filename} already processed (hash: {file_hash})")
-                    print(f"⚠️ Skipping to prevent duplicates")
-                    return {
-                        'success': False,
-                        'message': 'File already processed',
-                        'file_hash': file_hash,
-                        'duplicate_prevention': True
-                    }
-                else:
-                    print(f"✅ File not previously processed, continuing...")
-            else:
-                print(f"⚠️ Could not generate file hash, proceeding without deduplication")
+            # Note: File hash deduplication already handled in extract_measurements()
+            print(f"ℹ️ File hash already generated: {self.current_file_hash or 'None'}")
             
             # Try to create materialized views
             try:
@@ -1018,6 +1041,16 @@ class STDFProcessor:
         print(f"\n📈 COMPREHENSIVE PROCESSING STATISTICS:")
         print("=" * 60)
         
+        # Check if file was skipped
+        if (hasattr(self, 'processing_stats') and 
+            self.processing_stats.get('skipped_duplicate', False)):
+            print(f"⏭️ FILE SKIPPED (DUPLICATE)")
+            print(f"  Reason: File already processed")
+            print(f"  File hash: {self.processing_stats.get('file_hash', 'N/A')}")
+            print(f"  Processing time: 0.00s (no processing needed)")
+            print("=" * 60)
+            return
+        
         # Parsing stats
         if self.processing_stats:
             print(f"C++ Parsing:")
@@ -1112,6 +1145,14 @@ def main():
                 ch_user=args.ch_user,
                 ch_password=args.ch_password
             )
+            
+            # Check if file was skipped due to duplication
+            if (hasattr(processor, 'processing_stats') and 
+                processor.processing_stats.get('skipped_duplicate', False)):
+                print(f"⏭️ File {os.path.basename(stdf_file)} skipped (already processed)")
+                successful_files += 1  # Count as successful since it was handled properly
+                continue
+            
             overall_measurements += len(measurements)
             
             # Push to ClickHouse if requested

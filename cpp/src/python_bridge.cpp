@@ -296,15 +296,22 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
     const char* filepath;
     PyObject* device_mappings_list;
     PyObject* param_mappings_list;
+    const char* file_hash = "";
     
-    // Parse arguments: filepath, device_mappings, param_mappings
-    if (!PyArg_ParseTuple(args, "sOO", &filepath, &device_mappings_list, &param_mappings_list)) {
+    // Parse arguments: filepath, device_mappings, param_mappings, file_hash (optional)
+    if (!PyArg_ParseTuple(args, "sOO|s", &filepath, &device_mappings_list, &param_mappings_list, &file_hash)) {
         return nullptr;
     }
     
     try {
         // Create ultra-fast processor
         UltraFastProcessor processor;
+        
+        // Set the file hash from Python (MD5) to ensure consistency
+        if (file_hash && strlen(file_hash) > 0) {
+            processor.set_file_hash(std::string(file_hash));
+            std::cout << "🔑 Using Python-generated MD5 hash: " << file_hash << std::endl;
+        }
         
         // Convert Python lists to C++ vectors
         std::vector<std::pair<std::string, uint32_t>> device_mappings;
@@ -449,7 +456,7 @@ static PyMethodDef StdfParserMethods[] = {
     {"process_stdf_to_clickhouse_tuples", process_stdf_to_clickhouse_tuples, METH_VARARGS,
      "🚀 ULTRA-FAST: Process STDF to ClickHouse tuples entirely in C++"},
     {"process_stdf_with_database_mappings", process_stdf_with_database_mappings, METH_VARARGS,
-     "🔧 DATABASE-AWARE: Process STDF with existing database mappings"},
+     "🔧 DATABASE-AWARE: Process STDF with existing database mappings and optional file hash"},
     {"get_version", get_version, METH_NOARGS,
      "Get version information"},
     {nullptr, nullptr, 0, nullptr}
