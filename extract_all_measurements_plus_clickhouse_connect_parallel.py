@@ -721,6 +721,60 @@ class STDFProcessor:
             'total_time': total_time,
             'success': clickhouse_success
         }
+    
+    def process_file_with_cached_results(self, stdf_file, cached_result, clickhouse_host, clickhouse_port,
+                                       clickhouse_database, clickhouse_user, clickhouse_password):
+        """🚀 OPTIMIZED: Process file using cached C++ results - no re-parsing needed!"""
+        print(f"🔄 Processing: {os.path.basename(stdf_file)} (using cached results)")
+        
+        start_time = time.time()
+        
+        # 🚀 OPTIMIZATION: Skip extraction phase - use cached measurements directly
+        measurement_tuples = cached_result.get('measurement_tuples', [])
+        if not measurement_tuples:
+            print(f"⚠️ No cached measurements for {stdf_file}")
+            return {
+                'file': stdf_file,
+                'measurements': 0,
+                'extract_time': 0,
+                'clickhouse_time': 0,
+                'total_time': 0,
+                'success': False
+            }
+        
+        # Set up processor state from cached results
+        self.measurement_tuples = measurement_tuples
+        # 🐛 FIX: Don't re-insert mappings - they were already inserted in Phase 1!
+        self.new_device_mappings = []  # Empty - mappings already exist in DB
+        self.new_param_mappings = []   # Empty - mappings already exist in DB
+        self.current_file_hash = self._generate_file_hash(stdf_file)
+        
+        extract_time = 0.1  # Minimal time for cache retrieval
+        
+        print(f"🚀 CACHED RESULT: {len(measurement_tuples):,} measurements (no parsing needed!)")
+        
+        # Push to ClickHouse if enabled
+        clickhouse_time = 0
+        clickhouse_success = True
+        
+        if self.enable_clickhouse and clickhouse_host:
+            ch_start = time.time()
+            clickhouse_success = self.push_to_clickhouse(
+                measurement_tuples, clickhouse_host, clickhouse_port, 
+                clickhouse_database, clickhouse_user, clickhouse_password
+            )
+            clickhouse_time = time.time() - ch_start
+        
+        total_time = time.time() - start_time
+        
+        return {
+            'file': stdf_file,
+            'measurements': len(measurement_tuples),
+            'extract_time': extract_time,
+            'clickhouse_time': clickhouse_time,
+            'total_time': total_time,
+            'success': clickhouse_success
+        }
 
 
 class ParallelSTDFProcessor:
@@ -737,6 +791,7 @@ class ParallelSTDFProcessor:
         # Two-phase approach - no shared manager needed
         self.global_device_mappings = {}  # All devices from all files
         self.global_param_mappings = {}   # All parameters from all files
+        self.cached_results = {}          # Cache Phase 1 results to avoid re-parsing
         
         print(f"🚀 TWO-PHASE PARALLEL STDF PROCESSOR (Race-Condition Free)")
         print(f"======================================================================")
@@ -818,6 +873,9 @@ class ParallelSTDFProcessor:
                 if not result:
                     print(f"   ⚠️ No results from C++ processing")
                     continue
+                
+                # 🚀 OPTIMIZATION: Cache the full result to avoid re-parsing in Phase 2
+                self.cached_results[stdf_file] = result
                 
                 # Extract device names from new mappings (same as single file approach)
                 new_device_mappings = result.get('new_device_mappings', [])
@@ -997,6 +1055,9 @@ class ParallelSTDFProcessor:
                     processor.device_counter = max(self.global_device_mappings.values()) + 1 if self.global_device_mappings else 0
                     processor.param_counter = max(self.global_param_mappings.values()) + 1 if self.global_param_mappings else 0
                 
+                # 🚀 OPTIMIZATION: Pass cached results to avoid re-parsing
+                cached_result = self.cached_results.get(stdf_file)
+                
                 future = executor.submit(
                     self._process_single_file_phase2,
                     processor,
@@ -1005,7 +1066,8 @@ class ParallelSTDFProcessor:
                     clickhouse_port,
                     clickhouse_database, 
                     clickhouse_user,
-                    clickhouse_password
+                    clickhouse_password,
+                    cached_result  # 🚀 Pass cached result to avoid re-parsing
                 )
                 future_to_file[future] = stdf_file
             
@@ -1062,21 +1124,28 @@ class ParallelSTDFProcessor:
         return results
     
     def _process_single_file_phase2(self, processor, stdf_file, clickhouse_host, clickhouse_port,
-                                   clickhouse_database, clickhouse_user, clickhouse_password):
+                                   clickhouse_database, clickhouse_user, clickhouse_password, cached_result=None):
         """Process single file in Phase 2 with pre-computed ID mappings (no DB conflicts)"""
         file_start = time.time()
         
         try:
-            # Process file using existing logic but with pre-computed mappings
-            # This avoids all race conditions since mappings are read-only
-            result = processor.process_file(
-                stdf_file,
-                clickhouse_host,
-                clickhouse_port,
-                clickhouse_database,
-                clickhouse_user, 
-                clickhouse_password
-            )
+            # 🚀 OPTIMIZATION: Use cached result if available to avoid re-parsing
+            if cached_result:
+                print(f"🚀 Using cached C++ results for {os.path.basename(stdf_file)} - no re-parsing needed!")
+                result = processor.process_file_with_cached_results(
+                    stdf_file, cached_result, clickhouse_host, clickhouse_port,
+                    clickhouse_database, clickhouse_user, clickhouse_password
+                )
+            else:
+                # Fallback to normal processing
+                result = processor.process_file(
+                    stdf_file,
+                    clickhouse_host,
+                    clickhouse_port,
+                    clickhouse_database,
+                    clickhouse_user, 
+                    clickhouse_password
+                )
             
             return result
             
