@@ -19,15 +19,18 @@ static PyObject* stdf_record_to_dict(const STDFRecord& record) {
     
     // Basic fields
     PyDict_SetItemString(dict, "type", PyLong_FromLong(static_cast<long>(record.type)));
-    PyDict_SetItemString(dict, "test_num", PyLong_FromUnsignedLong(record.test_num));
-    PyDict_SetItemString(dict, "head_num", PyLong_FromUnsignedLong(record.head_num));
-    PyDict_SetItemString(dict, "site_num", PyLong_FromUnsignedLong(record.site_num));
-    PyDict_SetItemString(dict, "result", PyFloat_FromDouble(record.result));
-    PyDict_SetItemString(dict, "alarm_id", safe_unicode_from_string(record.alarm_id));
-    PyDict_SetItemString(dict, "test_txt", safe_unicode_from_string(record.test_txt));
-    PyDict_SetItemString(dict, "filename", safe_unicode_from_string(record.filename));
-    PyDict_SetItemString(dict, "record_index", PyLong_FromUnsignedLong(record.record_index));
-    PyDict_SetItemString(dict, "wld_id", safe_unicode_from_string(record.wld_id));
+    // Removed duplicate fields - these are now handled by .def files:
+    // - test_num -> TEST_NUM (from .def)
+    // - head_num -> HEAD_NUM (from .def)  
+    // - site_num -> SITE_NUM (from .def)
+    // - result -> RESULT (from .def)
+    
+    // Removed unused internal processing fields:
+    // - alarm_id: Not used by extract_all_measurements_plus_clickhouse_connect.py
+    // - test_txt: Not used by main processing pipeline
+    // - filename: Only used for debugging (not needed)
+    // - record_index: Only used for debugging (not needed) 
+    // - wld_id: Always empty, unused in current pipeline
     
     // Fields dictionary
     PyObject* fields_dict = PyDict_New();

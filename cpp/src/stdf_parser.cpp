@@ -105,20 +105,12 @@ void STDFParser::create_sample_records(std::vector<STDFRecord>& results) {
     // Create sample PTR record for testing
     STDFRecord ptr_record;
     ptr_record.type = STDFRecordType::PTR;
-    ptr_record.test_num = 1000512;
-    ptr_record.head_num = 1;
-    ptr_record.site_num = 1;
-    ptr_record.result = 0.0486745648086071;
+    // Note: STDF fields now handled by .def files
+    // Only set internal/non-STDF fields:
     ptr_record.alarm_id = "StaticPowerDiss:iddp_SLEEP;Mode=SLEEP;modSum;";
     ptr_record.test_txt = "TestPTR";
     ptr_record.filename = current_filename_;
     ptr_record.record_index = 1;
-    
-    // Add fields map
-    ptr_record.fields["TEST_NUM"] = std::to_string(ptr_record.test_num);
-    ptr_record.fields["HEAD_NUM"] = std::to_string(ptr_record.head_num);
-    ptr_record.fields["SITE_NUM"] = std::to_string(ptr_record.site_num);
-    ptr_record.fields["RESULT"] = std::to_string(ptr_record.result);
     ptr_record.fields["ALARM_ID"] = ptr_record.alarm_id;
     ptr_record.fields["TEST_TXT"] = ptr_record.test_txt;
     
@@ -127,18 +119,11 @@ void STDFParser::create_sample_records(std::vector<STDFRecord>& results) {
     // Create sample MPR record
     STDFRecord mpr_record;
     mpr_record.type = STDFRecordType::MPR;
-    mpr_record.test_num = 212;
-    mpr_record.head_num = 1;
-    mpr_record.site_num = 1;
-    mpr_record.result = -0.23524582386016846;
+    // Note: STDF fields now handled by .def files
+    // Only set internal/non-STDF fields:
     mpr_record.alarm_id = "PowerUp.ContinuityTest.DisconnectDPS.signalResult";
     mpr_record.filename = current_filename_;
     mpr_record.record_index = 2;
-    
-    mpr_record.fields["TEST_NUM"] = std::to_string(mpr_record.test_num);
-    mpr_record.fields["HEAD_NUM"] = std::to_string(mpr_record.head_num);
-    mpr_record.fields["SITE_NUM"] = std::to_string(mpr_record.site_num);
-    mpr_record.fields["RESULT"] = std::to_string(mpr_record.result);
     mpr_record.fields["ALARM_ID"] = mpr_record.alarm_id;
     
     results.push_back(mpr_record);
@@ -273,11 +258,8 @@ STDFRecord STDFParser::parse_ptr_record(void* ptr_rec) {
                 record.fields[field.first] = field.second;
             }
             
-            // Store in record structure for compatibility
-            record.test_num = ptr->TEST_NUM;
-            record.head_num = ptr->HEAD_NUM;
-            record.site_num = ptr->SITE_NUM;
-            record.result = ptr->RESULT;
+            // Note: test_num, head_num, site_num, result now handled by .def files
+            // Removed duplicate assignments to avoid field conflicts
           
         }
     } catch (...) {
@@ -346,14 +328,12 @@ STDFRecord STDFParser::parse_ptr_record(void* ptr_rec) {
                 record.fields["parm_flg"] = std::to_string(parm_flg);
                 
                 // Store in record structure
-                record.test_num = test_num;
-                record.head_num = head_num;
-                record.site_num = site_num;
+                // Note: test_num, head_num, site_num now handled by .def files
                 
                 if (rec->header.REC_LEN >= 12) {
                     float result = *reinterpret_cast<float*>(raw_data + 8);
                     record.fields["result"] = std::to_string(result);
-                    record.result = result;
+                    // Note: result now handled by .def files
                 }
                 
             } catch (...) {
@@ -395,27 +375,11 @@ STDFRecord STDFParser::parse_mpr_record(void* mpr_rec) {
             }
             
             // Store in record structure for compatibility
-            record.test_num = mpr->TEST_NUM;
-            record.head_num = mpr->HEAD_NUM;
-            record.site_num = mpr->SITE_NUM;
+            // Note: test_num, head_num, site_num now handled by .def files
             
-            // Optional: Extract text fields
-            if (mpr->TEST_TXT) {
-                record.fields["TEST_TXT"] = std::string(mpr->TEST_TXT + 1);  // Skip length byte
-                record.test_txt = record.fields["TEST_TXT"];
-            }
-            if (mpr->ALARM_ID) {
-                record.fields["ALARM_ID"] = std::string(mpr->ALARM_ID + 1);  // Skip length byte
-                record.alarm_id = record.fields["ALARM_ID"];
-            }
+            // Note: TEST_TXT and ALARM_ID now handled by .def files
             
-            // Extract additional MPR-specific fields
-            record.fields["opt_flag"] = std::to_string(mpr->OPT_FLAG);
-            record.fields["res_scal"] = std::to_string(mpr->RES_SCAL);
-            record.fields["llm_scal"] = std::to_string(mpr->LLM_SCAL);
-            record.fields["hlm_scal"] = std::to_string(mpr->HLM_SCAL);
-            record.fields["lo_limit"] = std::to_string(mpr->LO_LIMIT);
-            record.fields["hi_limit"] = std::to_string(mpr->HI_LIMIT);
+            // Note: All scale fields now handled by .def files
             record.fields["start_in"] = std::to_string(mpr->START_IN);
             record.fields["incr_in"] = std::to_string(mpr->INCR_IN);
             
@@ -462,9 +426,7 @@ STDFRecord STDFParser::parse_ftr_record(void* ftr_rec) {
             }
             
             // Store in record structure for compatibility
-            record.test_num = ftr->TEST_NUM;
-            record.head_num = ftr->HEAD_NUM;
-            record.site_num = ftr->SITE_NUM;
+            // Note: test_num, head_num, site_num now handled by .def files
             
             // Optional: Extract text fields
             if (ftr->VECT_NAM) {
@@ -476,14 +438,7 @@ STDFRecord STDFParser::parse_ftr_record(void* ftr_rec) {
             if (ftr->OP_CODE) {
                 record.fields["op_code"] = std::string(ftr->OP_CODE + 1);  // Skip length byte
             }
-            if (ftr->TEST_TXT) {
-                record.fields["test_txt"] = std::string(ftr->TEST_TXT + 1);  // Skip length byte
-                record.test_txt = record.fields["test_txt"];
-            }
-            if (ftr->ALARM_ID) {
-                record.fields["alarm_id"] = std::string(ftr->ALARM_ID + 1);  // Skip length byte
-                record.alarm_id = record.fields["alarm_id"];
-            }
+            // Note: TEST_TXT and ALARM_ID now handled by .def files
             if (ftr->PROG_TXT) {
                 record.fields["prog_txt"] = std::string(ftr->PROG_TXT + 1);  // Skip length byte
             }
@@ -535,13 +490,9 @@ STDFRecord STDFParser::parse_hbr_record(void* hbr_rec) {
             }
             
             // Store in record structure for compatibility
-            record.head_num = hbr->HEAD_NUM;
-            record.site_num = hbr->SITE_NUM;
+            // Note: head_num, site_num now handled by .def files
             
-            // Optional: Extract text field
-            if (hbr->HBIN_NAM) {
-                record.fields["hbin_nam"] = std::string(hbr->HBIN_NAM + 1);  // Skip length byte
-            }
+            // Note: HBIN_NAM handled by .def files
         }
     } catch (...) {
         // If casting fails, continue with basic approach
@@ -580,13 +531,9 @@ STDFRecord STDFParser::parse_sbr_record(void* sbr_rec) {
             }
             
             // Store in record structure for compatibility
-            record.head_num = sbr->HEAD_NUM;
-            record.site_num = sbr->SITE_NUM;
+            // Note: head_num, site_num now handled by .def files
             
-            // Optional: Extract text field
-            if (sbr->SBIN_NAM) {
-                record.fields["sbin_nam"] = std::string(sbr->SBIN_NAM + 1);  // Skip length byte
-            }
+            // Note: SBIN_NAM handled by .def files
         }
     } catch (...) {
         // If casting fails, continue with basic approach
@@ -675,8 +622,7 @@ STDFRecord STDFParser::parse_prr_record(void* prr_rec) {
             }
             
             // Store in record structure for compatibility
-            record.head_num = prr->HEAD_NUM;
-            record.site_num = prr->SITE_NUM;
+            // Note: head_num, site_num now handled by .def files
             
             // Optional: Extract text fields
             if (prr->PART_ID) {

@@ -212,14 +212,26 @@ std::string field_to_string(const T& value) {
     return std::to_string(value);
 }
 
+// Specialization for single-character fields (dtc_C1 - like HBIN_PF, SBIN_PF)
+template<>
+std::string field_to_string<char>(const char& value) {
+    // Convert ASCII value to character (80 -> 'P', 70 -> 'F')
+    if (value == 0) return "";
+    return std::string(1, value);
+}
+
 // Specialization for STDF string types (dtc_Cn - char*)
 template<>
 std::string field_to_string<char*>(char* const& value) {
     if (value == nullptr) return "";
     
-    // libstdf already processes the raw STDF strings and provides standard,
-    // null-terminated C-strings. No need to re-process or skip length bytes.
-    return std::string(value);
+    // STDF strings are length-prefixed: first byte is length, then string data
+    // The special characters (☺, ♣, etc.) are length bytes that need to be skipped
+    uint8_t length = static_cast<uint8_t>(value[0]);
+    if (length == 0) return "";
+    
+    // Extract string content after the length byte, ensuring null termination
+    return std::string(value + 1, length);
 }
 
 // Specialization for float* arrays (like RTN_RSLT)
