@@ -1,0 +1,108 @@
+STDF Field Definitions (.def files) - Quick Reference Guide
+=========================================================
+
+## How to Add New Fields to .def Files
+
+1. **Find the correct .def file:**
+   - PTR fields: cpp/field_defs/ptr_fields.def
+   - MPR fields: cpp/field_defs/mpr_fields.def
+   - FTR fields: cpp/field_defs/ftr_fields.def
+   - HBR fields: cpp/field_defs/hbr_fields.def
+   - SBR fields: cpp/field_defs/sbr_fields.def
+   - PRR fields: cpp/field_defs/prr_fields.def
+
+2. **Add field using FIELD macro:**
+   ```
+   FIELD("FIELD_NAME", LIBSTDF_MEMBER_NAME)
+   ```
+   
+   Examples:
+   ```
+   FIELD("TEST_NUM", TEST_NUM)
+   FIELD("RES_SCAL", RES_SCAL)
+   FIELD("TEST_TXT", TEST_TXT)
+   ```
+
+3. **Check libstdf availability:**
+   Before adding, verify the field exists in libstdf:
+   ```bash
+   grep -r "FIELD_NAME" cpp/third_party/include/
+   ```
+
+4. **Rebuild after changes:**
+   ```bash
+   LD_LIBRARY_PATH=$PWD/cpp/third_party/lib:$LD_LIBRARY_PATH python3 setup.py build_ext --inplace --force
+   ```
+
+## How to Remove Manual Field Assignments
+
+1. **Find manual assignments in C++ code:**
+   ```bash
+   grep -r "fields\[\"field_name\"\]" cpp/src/
+   ```
+
+2. **Remove conflicting lines:**
+   Look for patterns like:
+   ```cpp
+   record.fields["test_num"] = std::to_string(ptr->TEST_NUM);
+   ```
+   
+   Replace with comment:
+   ```cpp
+   // Note: TEST_NUM now handled by .def files
+   ```
+
+3. **Common conflict patterns to remove:**
+   - Lowercase duplicates: `test_num` vs `TEST_NUM`
+   - Mixed case duplicates: `head_num` vs `HEAD_NUM`
+   - String field duplicates: `test_txt` vs `TEST_TXT`
+
+## Field Naming Convention
+
+- **.def files**: Use UPPERCASE names exactly as in STDF spec
+  ```
+  FIELD("TEST_NUM", TEST_NUM)
+  FIELD("RESULT", RESULT)
+  ```
+
+- **Manual fields**: Use lowercase for non-STDF internal fields
+  ```cpp
+  record.fields["start_in"] = std::to_string(mpr->START_IN);  // Should be moved to .def
+  record.fields["filename"] = current_filename_;              // Internal field, OK
+  ```
+
+## Verification Steps
+
+1. **Test field extraction:**
+   ```bash
+   python test_field_extraction.py --stdf-file "path/to/file.stdf" --records-per-type 3
+   ```
+
+2. **Check for duplicates:**
+   Look for both uppercase and lowercase versions of the same field in output
+
+3. **Verify only UPPERCASE STDF fields:**
+   All STDF standard fields should appear in UPPERCASE from .def files
+
+## Current Status (Option 1 Implementation)
+
+✅ **Completed:**
+- Removed duplicate opt_flag/OPT_FLAG conflicts
+- Removed duplicate lo_limit/LO_LIMIT conflicts  
+- Removed duplicate hi_limit/HI_LIMIT conflicts
+- Removed duplicate test_txt/TEST_TXT conflicts
+- Removed duplicate alarm_id/ALARM_ID conflicts
+
+⚠️ **Still Manual (can be moved to .def):**
+- res_scal, llm_scal, hlm_scal (available in libstdf)
+- start_in, incr_in (available in libstdf)
+- hbin_nam, sbin_nam (available in libstdf as HBIN_NAM, SBIN_NAM)
+- prog_txt, rslt_txt (available in libstdf as PROG_TXT, RSLT_TXT)
+
+## Benefits of .def File Approach
+
+1. **Automatic field extraction** via X-Macros
+2. **Consistent UPPERCASE naming** 
+3. **No duplicate field conflicts**
+4. **Easy to add/remove fields** without C++ code changes
+5. **Type-safe extraction** with proper libstdf casting
