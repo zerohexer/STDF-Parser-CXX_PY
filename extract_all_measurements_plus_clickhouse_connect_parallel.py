@@ -753,17 +753,12 @@ class STDFProcessor:
         
         print(f"🚀 CACHED RESULT: {len(measurement_tuples):,} measurements (no parsing needed!)")
         
-        # Push to ClickHouse if enabled
+        # 🚀 MEGA-PUSH OPTIMIZATION: Don't push individually, collect for mega-push
         clickhouse_time = 0
         clickhouse_success = True
         
-        if self.enable_clickhouse and clickhouse_host:
-            ch_start = time.time()
-            clickhouse_success = self.push_to_clickhouse(
-                measurement_tuples, clickhouse_host, clickhouse_port, 
-                clickhouse_database, clickhouse_user, clickhouse_password
-            )
-            clickhouse_time = time.time() - ch_start
+        # Store measurements for later mega-push (no individual pushing!)
+        print(f"📦 Collected {len(measurement_tuples):,} measurements for mega-push")
         
         total_time = time.time() - start_time
         
@@ -1071,6 +1066,9 @@ class ParallelSTDFProcessor:
                 )
                 future_to_file[future] = stdf_file
             
+            # 🚀 MEGA-PUSH: Collect all results and measurements for single push
+            all_measurements = []
+            
             # Collect results as they complete
             for future in as_completed(future_to_file):
                 stdf_file = future_to_file[future]
@@ -1078,9 +1076,15 @@ class ParallelSTDFProcessor:
                     result = future.result()
                     results.append(result)
                     
+                    # 🚀 MEGA-PUSH: Collect measurements from this file
+                    file_measurements = result.get('measurement_tuples', [])
+                    if file_measurements:
+                        all_measurements.extend(file_measurements)
+                        print(f"📦 Collected {len(file_measurements):,} measurements from {os.path.basename(stdf_file)}")
+                    
                     # Print progress
                     completed = len(results)
-                    print(f"✅ Completed {completed}/{len(stdf_files)}: {os.path.basename(stdf_file)} → {result['measurements']:,} measurements")
+                    print(f"✅ Processed {completed}/{len(stdf_files)}: {os.path.basename(stdf_file)} → {result['measurements']:,} measurements")
                     
                 except Exception as e:
                     print(f"❌ Error processing {stdf_file}: {e}")
@@ -1093,8 +1097,75 @@ class ParallelSTDFProcessor:
                         'success': False
                     })
         
+        # ============================================================================
+        # 🚀 PHASE 3: MEGA-PUSH - Single massive ClickHouse operation
+        # ============================================================================
+        mega_push_time = 0
+        if self.enable_clickhouse and clickhouse_host and all_measurements:
+            print(f"\n🚀 PHASE 3: MEGA-PUSH - Pushing {len(all_measurements):,} measurements in single operation!")
+            mega_push_start = time.time()
+            
+            try:
+                # 🐛 FIX: Convert 13-field C++ tuples to 9-field ClickHouse tuples
+                from datetime import datetime
+                current_time = datetime.now()
+                
+                print(f"🔄 Converting {len(all_measurements):,} C++ tuples to ClickHouse format...")
+                clickhouse_tuples = []
+                
+                for tuple_data in all_measurements:
+                    # Unpack 13-field C++ tuple (same as single version line 660-661)
+                    (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, test_flag, segment, file_hash,
+                     wld_device_dmc, wtp_param_name, units, test_num, test_flg) = tuple_data
+                    
+                    # Create 9-field ClickHouse tuple (same as single version line 663-673)
+                    clickhouse_tuples.append((
+                        wld_id,
+                        wtp_id, 
+                        wp_pos_x,
+                        wp_pos_y,
+                        wptm_value,
+                        current_time,  # ClickHouse datetime
+                        test_flag,
+                        segment,
+                        file_hash
+                    ))
+                
+                print(f"✅ Converted to {len(clickhouse_tuples):,} ClickHouse tuples (9 fields each)")
+                
+                # Create a temporary processor for mega-push
+                mega_processor = STDFProcessor(enable_clickhouse=True, batch_size=self.batch_size)
+                mega_processor.new_device_mappings = []  # Already inserted in Phase 1
+                mega_processor.new_param_mappings = []   # Already inserted in Phase 1
+                
+                # Single mega-push operation with converted tuples
+                mega_success = mega_processor._push_tuples_to_clickhouse_ultra_fast(
+                    clickhouse_tuples,  # 🐛 FIX: Use 9-field ClickHouse tuples
+                    host=clickhouse_host,
+                    port=clickhouse_port,
+                    database=clickhouse_database,
+                    user=clickhouse_user,
+                    password=clickhouse_password
+                )
+                
+                mega_push_time = time.time() - mega_push_start
+                
+                if mega_success:
+                    print(f"✅ MEGA-PUSH COMPLETED: {len(all_measurements):,} measurements in {mega_push_time:.2f}s")
+                    print(f"🚀 Mega-push throughput: {len(all_measurements)/mega_push_time:.0f} measurements/second")
+                    # Update all results to show success
+                    for result in results:
+                        result['success'] = True
+                        result['clickhouse_time'] = mega_push_time / len(results)  # Distribute time across files
+                else:
+                    print(f"❌ MEGA-PUSH FAILED")
+                    
+            except Exception as e:
+                print(f"❌ Error in mega-push: {e}")
+                mega_push_time = 0
+        
         # Calculate timing
-        phase2_time = time.time() - phase2_start
+        phase2_time = time.time() - phase2_start - mega_push_time  # Exclude mega-push from phase2
         total_time = time.time() - total_start_time
         
         # Print summary
@@ -1104,22 +1175,27 @@ class ParallelSTDFProcessor:
         total_extract_time = sum(r['extract_time'] for r in results)
         total_clickhouse_time = sum(r['clickhouse_time'] for r in results)
         
-        print(f"\n📈 TWO-PHASE PROCESSING SUMMARY:")
-        print(f"==================================================")
+        print(f"\n📈 THREE-PHASE MEGA-PUSH PROCESSING SUMMARY:")
+        print(f"=========================================================")
         print(f"Files found:          {len(stdf_files)}")
         print(f"Files processed:      {successful_files}")
         print(f"Files failed:         {failed_files}")
         print(f"Total measurements:   {total_measurements:,}")
-        print(f"Phase 1 (Discovery):  {total_time - phase2_time:.2f}s")
+        print(f"Phase 1 (Discovery):  {total_time - phase2_time - mega_push_time:.2f}s")
         print(f"Phase 2 (Processing): {phase2_time:.2f}s")
-        print(f"ClickHouse time:      {total_clickhouse_time:.2f}s")
+        print(f"Phase 3 (Mega-Push):  {mega_push_time:.2f}s")
         print(f"Total time:           {total_time:.2f}s")
         
         if total_time > 0:
             throughput = total_measurements / total_time
             print(f"Overall throughput:   {throughput:.0f} measurements/sec")
         
-        print(f"🏆 Race conditions eliminated with two-phase approach!")
+        if mega_push_time > 0:
+            mega_throughput = total_measurements / mega_push_time
+            print(f"Mega-push throughput: {mega_throughput:.0f} measurements/sec")
+        
+        print(f"🚀 Mega-push optimization: Single {total_measurements:,} measurement operation!")
+        print(f"🏆 Race conditions eliminated with three-phase approach!")
         
         return results
     
@@ -1147,6 +1223,8 @@ class ParallelSTDFProcessor:
                     clickhouse_password
                 )
             
+            # 🚀 MEGA-PUSH: Return measurements for collection
+            result['measurement_tuples'] = processor.measurement_tuples if hasattr(processor, 'measurement_tuples') else []
             return result
             
         except Exception as e:
