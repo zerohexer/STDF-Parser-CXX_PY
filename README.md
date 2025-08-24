@@ -57,7 +57,7 @@ LD_LIBRARY_PATH=$PWD/cpp/third_party/lib:$LD_LIBRARY_PATH python3 test_parser.py
 
 OR
 
-./run_test.sh
+LD_LIBRARY_PATH=$PWD/cpp/third_party/lib:$LD_LIBRARY_PATH python3 test_universal.py
 
 ```
 
@@ -268,3 +268,18 @@ This project uses libstdf (GPL license) for STDF parsing functionality. See libs
   - Windows static linking with MinGW
   - Linux shared library support
   - Production-ready performance (90K+ records/second)
+
+## Clickhouse integration and Debugging
+
+```bash
+Pushing to clickhouse
+python extract_all_measurements_plus_clickhouse_connect.py --stdf-file "PATH/File Directory" --push-clickhouse --ch-host <IP> --ch-port 9000 --ch-database <DB/namespace> --ch-user <name> --ch-password <password>
+
+Example:
+python extract_all_measurements_plus_clickhouse_connect.py --stdf-file "STDF_Files/OS_KEWGBCLD1U_BE_HRG3301Y.06_KEWGBCLD1U__Prod_TPP202_03_Agilent_93000MT9510_25C_5264_2_20240903225946.stdf" --push-clickhouse --ch-host 127.0.0.1 --ch-port 9000 --ch-database iswc --ch-user admin --ch-password admin
+
+Debugging verify ID and segmentation for deduplication:
+python verify_ids_and_segments.py --stdf-file "PATH/File Directory" --push-clickhouse --ch-host <IP> --ch-port 9000 --ch-database <DB/namespace> --ch-user <name> --ch-password <password>
+
+
+```
