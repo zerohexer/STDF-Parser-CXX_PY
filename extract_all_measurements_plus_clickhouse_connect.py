@@ -405,10 +405,10 @@ class STDFProcessor:
         for test in test_records:
             test_fields = test.get('fields', {})
             
-            # CRITICAL: Apply pixel test filtering like original _process_single_test
-            # Use same data sources as old working code
-            param_name = test.get('test_txt', '')  # Direct field like old code
-            test_txt = test.get('test_txt', '')    # Same as param_name
+            # CRITICAL: Apply pixel test filtering using .def file extractions
+            # Use TEST_TXT and ALARM_ID from .def file extractions (more maintainable)
+            param_name = test_fields.get('TEST_TXT', test_fields.get('ALARM_ID', ''))
+            test_txt = test_fields.get('TEST_TXT', test_fields.get('ALARM_ID', ''))
             
             # Skip if not a pixel test (same filtering as old code)
             if not self._is_pixel_test(param_name, test_txt):

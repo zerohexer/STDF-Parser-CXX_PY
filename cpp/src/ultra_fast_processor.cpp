@@ -221,7 +221,21 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
         pt.values = parse_test_values(test);
         
         // Clean parameter name
-        std::string param_name = test.alarm_id.empty() ? test.test_txt : test.alarm_id;
+        // Use .def file extractions for parameter names (consistent with is_pixel_test)
+        std::string alarm_id = "";
+        std::string test_txt = "";
+        
+        auto alarm_it = test.fields.find("ALARM_ID");
+        if (alarm_it != test.fields.end()) {
+            alarm_id = alarm_it->second;
+        }
+        
+        auto test_txt_it = test.fields.find("TEST_TXT");
+        if (test_txt_it != test.fields.end()) {
+            test_txt = test_txt_it->second;
+        }
+        
+        std::string param_name = alarm_id.empty() ? test_txt : alarm_id;
         pt.cleaned_param_name = clean_param_name(param_name);
         pt.param_id = id_manager_.get_param_id(pt.cleaned_param_name);
         
@@ -326,8 +340,20 @@ std::vector<STDFRecord> UltraFastProcessor::filter_test_records(const std::vecto
 }
 
 bool UltraFastProcessor::is_pixel_test(const STDFRecord& test_record) {
-    const std::string& alarm_id = test_record.alarm_id;
-    const std::string& test_txt = test_record.test_txt;
+    // Use .def file extractions instead of record-level fields (more maintainable)
+    std::string alarm_id = "";
+    std::string test_txt = "";
+    
+    // Get ALARM_ID and TEST_TXT from .def file extractions
+    auto alarm_it = test_record.fields.find("ALARM_ID");
+    if (alarm_it != test_record.fields.end()) {
+        alarm_id = alarm_it->second;
+    }
+    
+    auto test_txt_it = test_record.fields.find("TEST_TXT");
+    if (test_txt_it != test_record.fields.end()) {
+        test_txt = test_txt_it->second;
+    }
     
     return (alarm_id.find("Pixel=") != std::string::npos) ||
            (test_txt.find("Pixel=") != std::string::npos);
