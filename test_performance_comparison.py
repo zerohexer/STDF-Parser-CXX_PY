@@ -67,8 +67,8 @@ def test_cpp_parser():
         traceback.print_exc()
         return None
 
-def run_python_comparison():
-    """Run the Python fair comparison test"""
+def run_python_comparison(cpp_results):
+    """Run the Python fair comparison test with dynamic C++ results"""
     print(f"\n🐍 Running Python Fair Comparison Test...")
     print("=" * 50)
     
@@ -79,25 +79,50 @@ def run_python_comparison():
         try:
             os.chdir(python_dir)
             import subprocess
-            result = subprocess.run([sys.executable, "test_fair_comparison.py"], 
-                                  capture_output=True, text=True, timeout=120)
+            import json
+            import tempfile
+            
+            # Create temporary file with dynamic C++ results
+            cpp_data = {
+                'record_types': cpp_results['record_types'],
+                'parsed_records': cpp_results['parsed_records'],
+                'parse_time': cpp_results['parse_time'],
+                'records_per_second': cpp_results['records_per_second']
+            }
+            
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                json.dump(cpp_data, f)
+                cpp_results_file = f.name
+            
+            # Pass C++ results file as argument
+            result = subprocess.run([sys.executable, "test_fair_comparison.py", "--cpp-results", cpp_results_file], 
+                                  capture_output=True, text=True, encoding='utf-8', 
+                                  errors='replace', timeout=120)
+            
+            # Clean up temp file
+            os.unlink(cpp_results_file)
             
             if result.returncode == 0:
                 print("✅ Python comparison completed!")
                 print("📄 Python Results:")
                 print(result.stdout)
+                return True
             else:
                 print("❌ Python comparison failed!")
                 print("Error:", result.stderr)
+                return False
                 
         except subprocess.TimeoutExpired:
             print("⏰ Python test timed out after 120 seconds")
+            return False
         except Exception as e:
             print(f"❌ Error running Python test: {e}")
+            return False
         finally:
             os.chdir(original_dir)
     else:
         print(f"❌ Python directory not found: {python_dir}")
+        return False
 
 def main():
     print("🏁 STDF Parser Performance Comparison")
@@ -106,8 +131,12 @@ def main():
     # Test C++ parser first
     cpp_results = test_cpp_parser()
     
-    # Run Python comparison
-    run_python_comparison()
+    # Run Python comparison with dynamic C++ results
+    if cpp_results:
+        python_success = run_python_comparison(cpp_results)
+    else:
+        print("❌ Cannot run Python comparison without C++ results")
+        python_success = False
     
     # Final summary
     if cpp_results:
