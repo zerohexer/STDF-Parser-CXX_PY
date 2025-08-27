@@ -242,6 +242,16 @@ LD_LIBRARY_PATH=$PWD/cpp/third_party/lib:$LD_LIBRARY_PATH python3 your_script.py
 sudo apt-get install python3-dev
 ```
 
+### Troubleshooting records , records type and fields
+```bash
+
+Run after build setup.py / setup_windows_mingw.py
+python test_universal.py (test if build succeed , and library is in USED)
+python debug_record_type.py  (record type and record count comparison accuracy)
+python compare_cpp_vs_pystdf.py (compare record fields / record type comparison)
+python test_field_extraction.py (Extract each fields from record type using cpp parser)
+```
+
 ## Performance Notes
 
 - **Windows**: Static linking provides best performance (no DLL overhead)
@@ -283,3 +293,4 @@ python verify_ids_and_segments.py --stdf-file "PATH/File Directory" --push-click
 
 
 ```
+
