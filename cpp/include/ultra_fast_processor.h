@@ -25,7 +25,7 @@ struct MeasurementTuple {
         cpp_type name;
     
     // Include all fields from measurement_fields.def
-    #include "measurement_fields.def"
+    #include "../field_defs/measurement_fields.def"
     
     // Undefine the macro
     #undef MEASUREMENT_FIELD

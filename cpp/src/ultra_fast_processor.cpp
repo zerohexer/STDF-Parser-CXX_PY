@@ -1,5 +1,4 @@
 #include "../include/ultra_fast_processor.h"
-#include "../include/measurement_macros.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -295,8 +294,28 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
             for (double value : test.values) {
                 MeasurementTuple measurement;
                 
-                // 🚀 MACRO-DRIVEN: Initialize all fields using macro  
-                INIT_MEASUREMENT(measurement, device_dmc, device_id, test, value, test_flag, file_hash_);
+                // 🚀 MACRO-DRIVEN: Initialize measurement using X-Macro pattern from .def file
+                // Define initialization values for each field type
+                auto init_wld_id = device_id;
+                auto init_wtp_id = test.param_id;
+                auto init_wp_pos_x = (test.pixel_x != 0) ? test.pixel_x : default_x;
+                auto init_wp_pos_y = (test.pixel_y != 0) ? test.pixel_y : default_y;
+                auto init_wptm_value = value;
+                auto init_test_flag = test_flag;
+                auto init_segment = static_cast<uint8_t>(0);
+                auto init_file_hash = file_hash_;
+                auto init_wld_device_dmc = device_dmc;
+                auto init_wtp_param_name = test.cleaned_param_name;
+                auto init_units = test.units;
+                auto init_test_num = test.test_num;
+                auto init_test_flg = test.test_flg;
+                
+                // X-Macro initialization - automatically assigns all fields from .def file
+                #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
+                    measurement.name = init_##name;
+                
+                #include "../field_defs/measurement_fields.def"
+                #undef MEASUREMENT_FIELD
                 
                 measurements.push_back(std::move(measurement));
                 measurements_created++;

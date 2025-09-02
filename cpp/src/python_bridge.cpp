@@ -219,7 +219,7 @@ static PyObject* process_stdf_to_clickhouse_tuples(PyObject* self, PyObject* arg
         // 🚀 MACRO-DRIVEN: Calculate tuple size automatically
         constexpr size_t TUPLE_SIZE = 0
         #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) + 1
-        #include "../include/measurement_fields.def"
+        #include "../field_defs/measurement_fields.def"
         #undef MEASUREMENT_FIELD
         ;
         
@@ -238,7 +238,7 @@ static PyObject* process_stdf_to_clickhouse_tuples(PyObject* self, PyObject* arg
             #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
                 PyTuple_SetItem(tuple, field_index++, python_conversion(m.name));
             
-            #include "../include/measurement_fields.def"
+            #include "../field_defs/measurement_fields.def"
             #undef MEASUREMENT_FIELD
             
             PyList_SetItem(tuple_list, i, tuple);
@@ -373,7 +373,7 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
         
         constexpr size_t TUPLE_SIZE = 0
         #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) + 1
-        #include "../include/measurement_fields.def"
+        #include "../field_defs/measurement_fields.def"
         #undef MEASUREMENT_FIELD
         ;
         
@@ -393,7 +393,7 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
             #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
                 PyTuple_SetItem(tuple, field_index++, python_conversion(m.name));
             
-            #include "../include/measurement_fields.def"
+            #include "../field_defs/measurement_fields.def"
             #undef MEASUREMENT_FIELD
             
             PyList_SetItem(tuple_list, i, tuple);
