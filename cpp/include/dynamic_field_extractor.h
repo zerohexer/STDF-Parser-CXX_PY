@@ -69,5 +69,6 @@ template<> void DynamicFieldExtractor::extract_fields<rec_ftr>(rec_ftr* record, 
 template<> void DynamicFieldExtractor::extract_fields<rec_hbr>(rec_hbr* record, DynamicSTDFRecord& out_record);
 template<> void DynamicFieldExtractor::extract_fields<rec_sbr>(rec_sbr* record, DynamicSTDFRecord& out_record);
 template<> void DynamicFieldExtractor::extract_fields<rec_prr>(rec_prr* record, DynamicSTDFRecord& out_record);
+template<> void DynamicFieldExtractor::extract_fields<rec_mir>(rec_mir* record, DynamicSTDFRecord& out_record);
 
 #endif // DYNAMIC_FIELD_EXTRACTOR_H

@@ -546,47 +546,38 @@ STDFRecord STDFParser::parse_mir_record(void* mir_rec) {
     STDFRecord record;
     record.type = STDFRecordType::MIR;
     
-    rec_mir* mir = static_cast<rec_mir*>(mir_rec);
+    rec_unknown* rec = static_cast<rec_unknown*>(mir_rec);
     
-    // Store MIR context for other records
-    if (mir->LOT_ID) {
-        mir_lot_id_ = std::string(mir->LOT_ID);
-        record.fields["LOT_ID"] = mir_lot_id_;
-    }
-    if (mir->PART_TYP) {
-        mir_part_typ_ = std::string(mir->PART_TYP);
-        record.fields["PART_TYP"] = mir_part_typ_;
-    }
-    if (mir->JOB_NAM) {
-        mir_job_nam_ = std::string(mir->JOB_NAM);
-        record.fields["JOB_NAM"] = mir_job_nam_;
-    }
+    // Store header info safely
+    record.rec_type = rec->header.REC_TYP;
+    record.rec_subtype = rec->header.REC_SUB;
+    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
+    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
+    record.fields["RECORD_TYPE"] = "MIR";
     
-    record.fields["SETUP_T"] = std::to_string(mir->SETUP_T);
-    record.fields["START_T"] = std::to_string(mir->START_T);
-    record.fields["STAT_NUM"] = std::to_string(mir->STAT_NUM);
-    
-    if (mir->MODE_COD) {
-        record.fields["MODE_COD"] = std::string(1, mir->MODE_COD);
-    }
-    if (mir->RTST_COD) {
-        record.fields["RTST_COD"] = std::string(1, mir->RTST_COD);
-    }
-    if (mir->PROT_COD) {
-        record.fields["PROT_COD"] = std::string(1, mir->PROT_COD);
-    }
-    
-    if (mir->NODE_NAM) {
-        record.fields["NODE_NAM"] = std::string(mir->NODE_NAM);
-    }
-    if (mir->TSTR_TYP) {
-        record.fields["TSTR_TYP"] = std::string(mir->TSTR_TYP);
-    }
-    if (mir->EXEC_TYP) {
-        record.fields["EXEC_TYP"] = std::string(mir->EXEC_TYP);
-    }
-    if (mir->EXEC_VER) {
-        record.fields["EXEC_VER"] = std::string(mir->EXEC_VER);
+    // PROPER LIBSTDF APPROACH: Direct casting (consistent with other records)
+    try {
+        // Check if it's actually a MIR record using libstdf macros
+        if (HEAD_TO_REC(rec->header) == REC_MIR) {
+            // Official libstdf approach: cast rec_unknown* to rec_mir*
+            rec_mir* mir = (rec_mir*)rec;
+            
+            // Extract ALL MIR fields using global shared extractor
+            DynamicSTDFRecord dynamic_record;
+            g_field_extractor.extract_fields(mir, dynamic_record);
+            
+            // Copy ALL extracted fields from X-Macros to main record
+            for (const auto& field : dynamic_record.fields) {
+                record.fields[field.first] = field.second;
+            }
+            
+        } else {
+            std::cerr << "Warning: Record header mismatch in parse_mir_record" << std::endl;
+        }
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Exception in parse_mir_record: " << e.what() << std::endl;
+        record.fields["ERROR"] = e.what();
     }
     
     return record;

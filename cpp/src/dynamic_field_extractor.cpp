@@ -7,7 +7,7 @@ DynamicFieldExtractor::DynamicFieldExtractor(const std::string& config_file)
     : config_file_path_(config_file) {
     
     // NO CONFIG FILES - Extract ALL fields from .def files automatically
-    std::cout << "🚀 DynamicFieldExtractor: Extracting ALL fields from .def files (no config filtering)" << std::endl;
+    std::cout << "DynamicFieldExtractor: Extracting ALL fields from .def files" << std::endl;
     
     // Enable ALL fields from each .def file
     enabled_fields_["PTR"] = get_all_available_fields("PTR");
@@ -16,6 +16,7 @@ DynamicFieldExtractor::DynamicFieldExtractor(const std::string& config_file)
     enabled_fields_["HBR"] = get_all_available_fields("HBR");
     enabled_fields_["SBR"] = get_all_available_fields("SBR");
     enabled_fields_["PRR"] = get_all_available_fields("PRR");
+    enabled_fields_["MIR"] = get_all_available_fields("MIR");
     
     print_configuration_summary();
 }
@@ -154,6 +155,11 @@ std::set<std::string> DynamicFieldExtractor::get_all_available_fields(const std:
     else if (record_type == "PRR") {
         #define FIELD(name, member) available_fields.insert(name);
         #include "../field_defs/prr_fields.def"
+        #undef FIELD
+    }
+    else if (record_type == "MIR") {
+        #define FIELD(name, member) available_fields.insert(name);
+        #include "../field_defs/mir_fields.def"
         #undef FIELD
     }
     
@@ -399,5 +405,25 @@ void DynamicFieldExtractor::extract_fields<rec_prr>(rec_prr* prr, DynamicSTDFRec
         }
     
     #include "../field_defs/prr_fields.def"
+    #undef FIELD
+}
+
+// MIR Record Extraction
+template<>
+void DynamicFieldExtractor::extract_fields<rec_mir>(rec_mir* mir, DynamicSTDFRecord& out_record) {
+    if (!mir) return;
+    
+    out_record.type_name = "MIR";
+    const std::set<std::string>& enabled = get_enabled_fields("MIR");
+    
+    if (enabled.empty()) return;
+    
+    // X-Macros: Unified field extraction
+    #define FIELD(name, member) \
+        if (enabled.count(name)) { \
+            out_record.fields[name] = field_to_string(mir->member); \
+        }
+    
+    #include "../field_defs/mir_fields.def"
     #undef FIELD
 }
