@@ -1,0 +1,68 @@
+// MIR (Master Information Record) Field Definitions
+// Format: FIELD(field_name, member_name)
+
+// Core timing and setup
+FIELD("SETUP_T", SETUP_T)
+FIELD("START_T", START_T)
+FIELD("STAT_NUM", STAT_NUM)
+
+// Mode and control codes
+FIELD("MODE_COD", MODE_COD)
+FIELD("RTST_COD", RTST_COD)
+FIELD("PROT_COD", PROT_COD)
+FIELD("CMOD_COD", CMOD_COD)
+
+// Timing
+FIELD("BURN_TIM", BURN_TIM)
+
+// Lot and part identification
+FIELD("LOT_ID", LOT_ID)
+FIELD("PART_TYP", PART_TYP)
+FIELD("NODE_NAM", NODE_NAM)
+FIELD("TSTR_TYP", TSTR_TYP)
+
+// Job information
+FIELD("JOB_NAM", JOB_NAM)
+FIELD("JOB_REV", JOB_REV)
+FIELD("SBLOT_ID", SBLOT_ID)
+FIELD("OPER_NAM", OPER_NAM)
+
+// Execution information
+FIELD("EXEC_TYP", EXEC_TYP)
+FIELD("EXEC_VER", EXEC_VER)
+FIELD("TEST_COD", TEST_COD)
+FIELD("TST_TEMP", TST_TEMP)
+
+// User and auxiliary data
+FIELD("USER_TXT", USER_TXT)
+FIELD("AUX_FILE", AUX_FILE)
+FIELD("PKG_TYP", PKG_TYP)
+FIELD("FAMILY_ID", FAMILY_ID)
+FIELD("DATE_COD", DATE_COD)
+
+// Facility information
+FIELD("FACIL_ID", FACIL_ID)
+FIELD("FLOOR_ID", FLOOR_ID)
+FIELD("PROC_ID", PROC_ID)
+FIELD("OPER_FRQ", OPER_FRQ)
+
+// Specification information
+FIELD("SPEC_NAM", SPEC_NAM)
+FIELD("SPEC_VER", SPEC_VER)
+FIELD("FLOW_ID", FLOW_ID)
+FIELD("SETUP_ID", SETUP_ID)
+
+// Design and engineering
+FIELD("DSGN_REV", DSGN_REV)
+FIELD("ENG_ID", ENG_ID)
+FIELD("ROM_COD", ROM_COD)
+FIELD("SERL_NUM", SERL_NUM)
+FIELD("SUPR_NAM", SUPR_NAM)
+
+#ifdef STDF_VER3
+// Version 3 specific fields
+FIELD("CPU_TYPE", CPU_TYPE)
+FIELD("STDF_VER", STDF_VER)
+FIELD("HAND_ID", HAND_ID)
+FIELD("PRB_CARD", PRB_CARD)
+#endif
