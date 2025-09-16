@@ -5,6 +5,7 @@
 #include <chrono>
 #include <algorithm>
 #include <iomanip>
+#include <unordered_map>
 
 // FastIDManager Implementation
 FastIDManager::FastIDManager() 
@@ -265,6 +266,9 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
     // Process cross-product
     size_t measurements_created = 0;
     
+    // 🚀 SEGMENT TRACKING: Add duplicate tracking for segment calculation
+    std::unordered_map<std::string, uint32_t> duplicate_tracker;
+    
     for (const auto& prr : prr_records) {
         // Extract device information
         auto get_prr_field = [&](const std::string& key, const std::string& fallback = "") {
@@ -302,7 +306,17 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
                 auto init_wp_pos_y = (test.pixel_y != 0) ? test.pixel_y : default_y;
                 auto init_wptm_value = value;
                 auto init_test_flag = test_flag;
-                auto init_segment = static_cast<uint8_t>(0);
+                
+                // 🚀 SEGMENT CALCULATION: Create duplicate key INCLUDING VALUE and increment segment
+                // Only increment segment for EXACT duplicates (same coordinates AND same value)
+                std::string duplicate_key = std::to_string(init_wld_id) + "_" + 
+                                          std::to_string(init_wtp_id) + "_" + 
+                                          std::to_string(init_wp_pos_x) + "_" + 
+                                          std::to_string(init_wp_pos_y) + "_" + 
+                                          std::to_string(test.test_flg) + "_" + 
+                                          std::to_string(init_wptm_value);
+                
+                auto init_segment = static_cast<uint8_t>(duplicate_tracker[duplicate_key]++);
                 auto init_file_hash = file_hash_;
                 auto init_wld_device_dmc = device_dmc;
                 auto init_wtp_param_name = test.cleaned_param_name;
@@ -325,6 +339,8 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
     
     std::cout << "✅ C++ cross-product completed: " << measurements_created 
               << " measurements created" << std::endl;
+    std::cout << "🔢 Segment tracking: " << duplicate_tracker.size() 
+              << " unique coordinate combinations tracked" << std::endl;
     
     return measurements;
 }
