@@ -147,6 +147,73 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file(const std::s
     return measurements;
 }
 
+std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file_measurements(const std::string& filepath) {
+    std::vector<MeasurementTuple> measurements;
+
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    try {
+        std::cout << "🚀 Ultra-fast C++ processing (NO HASH, NO SEGMENTS): " << filepath << std::endl;
+
+        // Step 1: Parse STDF file using existing parser
+        auto parse_start = std::chrono::high_resolution_clock::now();
+
+        STDFParser parser;
+        std::vector<STDFRecord> records = parser.parse_file(filepath);
+
+        auto parse_end = std::chrono::high_resolution_clock::now();
+        parsing_time_ = std::chrono::duration<double>(parse_end - parse_start).count();
+        total_records_ = records.size();
+
+        std::cout << "⚡ C++ parsed " << total_records_ << " records in "
+                  << parsing_time_ << "s" << std::endl;
+
+        // Step 2: Process records entirely in C++
+        auto process_start = std::chrono::high_resolution_clock::now();
+
+        // Group records by type
+        auto mir_records = filter_records_by_type(records, STDFRecordType::MIR);
+        auto prr_records = filter_records_by_type(records, STDFRecordType::PRR);
+        auto test_records = filter_test_records(records);
+
+        std::cout << "📊 Found " << mir_records.size() << " MIR, "
+                  << prr_records.size() << " PRR, "
+                  << test_records.size() << " test records" << std::endl;
+
+        // Extract MIR information
+        MIRInfo mir_info = extract_mir_info(mir_records);
+
+        // 🔥 SKIP FILE HASH: No file hash calculation (was causing hanging!)
+        file_hash_ = "no_hash";
+
+        // 🚀 Process cross-product WITHOUT segments (much faster!)
+        measurements = process_cross_product_measurements(prr_records, test_records, mir_info);
+
+        auto process_end = std::chrono::high_resolution_clock::now();
+        processing_time_ = std::chrono::duration<double>(process_end - process_start).count();
+        processed_measurements_ = measurements.size();
+
+        auto total_time = std::chrono::duration<double>(process_end - start_time).count();
+
+        std::cout << "✅ Ultra-fast C++ processing completed:" << std::endl;
+        std::cout << "   📊 Total records: " << total_records_ << std::endl;
+        std::cout << "   📊 Measurements: " << processed_measurements_ << std::endl;
+        std::cout << "   ⏱️ Parsing time: " << parsing_time_ << "s" << std::endl;
+        std::cout << "   ⏱️ Processing time: " << processing_time_ << "s" << std::endl;
+        std::cout << "   ⏱️ Total time: " << total_time << "s" << std::endl;
+
+        if (total_time > 0) {
+            double throughput = processed_measurements_ / total_time;
+            std::cout << "   🚀 Throughput: " << static_cast<size_t>(throughput) << " measurements/seconds" << std::endl;
+        }
+
+    } catch (const std::exception& e) {
+        std::cerr << "❌ Error processing STDF file: " << e.what() << std::endl;
+    }
+
+    return measurements;
+}
+
 MIRInfo UltraFastProcessor::extract_mir_info(const std::vector<STDFRecord>& mir_records) {
     MIRInfo mir_info;
     
@@ -342,6 +409,167 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
     std::cout << "🔢 Segment tracking: " << duplicate_tracker.size() 
               << " unique coordinate combinations tracked" << std::endl;
     
+    return measurements;
+}
+
+std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurements(
+    const std::vector<STDFRecord>& prr_records,
+    const std::vector<STDFRecord>& test_records,
+    const MIRInfo& mir_info) {
+
+    std::vector<MeasurementTuple> measurements;
+
+    if (prr_records.empty() || test_records.empty()) {
+        std::cout << "⚠️ No PRR or test records found for cross-product" << std::endl;
+        return measurements;
+    }
+
+    // Pre-allocate measurements vector
+    size_t estimated_size = prr_records.size() * test_records.size() * 3; // Estimate 3 values per test
+    measurements.reserve(estimated_size);
+
+    std::cout << "🚀 C++ cross-product (NO SEGMENTS): " << prr_records.size() << " devices × "
+              << test_records.size() << " tests = ~" << estimated_size << " estimated measurements" << std::endl;
+
+    // Pre-process test records with pixel filtering
+    struct ProcessedTest {
+        std::vector<double> values;
+        std::string cleaned_param_name;
+        std::string units;
+        uint32_t test_num;
+        uint8_t test_flg;
+        int32_t pixel_x;
+        int32_t pixel_y;
+        uint32_t param_id;
+    };
+
+    std::vector<ProcessedTest> processed_tests;
+    processed_tests.reserve(test_records.size());
+
+    size_t pixel_tests_found = 0;
+
+    for (const auto& test : test_records) {
+        // Apply pixel filtering if enabled
+        if (enable_pixel_filtering_ && !is_pixel_test(test)) {
+            continue;
+        }
+
+        pixel_tests_found++;
+
+        ProcessedTest pt;
+
+        // Parse test values
+        pt.values = parse_test_values(test);
+
+        // Clean parameter name
+        std::string alarm_id = "";
+        std::string test_txt = "";
+
+        auto alarm_it = test.fields.find("ALARM_ID");
+        if (alarm_it != test.fields.end()) {
+            alarm_id = alarm_it->second;
+        }
+
+        auto test_txt_it = test.fields.find("TEST_TXT");
+        if (test_txt_it != test.fields.end()) {
+            test_txt = test_txt_it->second;
+        }
+
+        std::string param_name = alarm_id.empty() ? test_txt : alarm_id;
+        pt.cleaned_param_name = clean_param_name(param_name);
+        pt.param_id = id_manager_.get_param_id(pt.cleaned_param_name);
+
+        // Extract other fields
+        auto get_field = [&](const std::string& key, const std::string& fallback = "") {
+            auto it = test.fields.find(key);
+            return (it != test.fields.end()) ? it->second : fallback;
+        };
+
+        pt.units = test.units;
+        pt.test_num = test.test_num;
+
+        // Parse TEST_FLG
+        std::string test_flg_str = get_field("TEST_FLG", "0");
+        pt.test_flg = static_cast<uint8_t>(std::stoul(test_flg_str));
+
+        // Extract pixel coordinates
+        auto coords = extract_pixel_coordinates(param_name);
+        pt.pixel_x = coords.first;
+        pt.pixel_y = coords.second;
+
+        processed_tests.push_back(std::move(pt));
+    }
+
+    std::cout << "🎯 Pre-processed " << pixel_tests_found << " pixel tests from "
+              << test_records.size() << " total tests" << std::endl;
+
+    // Process cross-product
+    size_t measurements_created = 0;
+
+    // 🚀 NO SEGMENT TRACKING: Skip expensive string operations and duplicate tracking!
+    for (const auto& prr : prr_records) {
+        // Extract device information
+        auto get_prr_field = [&](const std::string& key, const std::string& fallback = "") {
+            auto it = prr.fields.find(key);
+            return (it != prr.fields.end()) ? it->second : fallback;
+        };
+
+        std::string device_dmc = get_prr_field("PART_ID", get_prr_field("PART_TXT"));
+        std::string bin_code = get_prr_field("SOFT_BIN", get_prr_field("HARD_BIN"));
+
+        // Parse coordinates with defaults
+        int32_t default_x = 0, default_y = 0;
+        try {
+            std::string x_coord = get_prr_field("X_COORD", "0");
+            std::string y_coord = get_prr_field("Y_COORD", "0");
+            default_x = std::stoi(x_coord);
+            default_y = std::stoi(y_coord);
+        } catch (...) {
+            // Use defaults if parsing fails
+        }
+
+        uint32_t device_id = id_manager_.get_device_id(device_dmc);
+        uint8_t test_flag = calculate_test_flag(prr);
+
+        // Create measurements for this device
+        for (const auto& test : processed_tests) {
+            for (double value : test.values) {
+                MeasurementTuple measurement;
+
+                // 🚀 MACRO-DRIVEN: Initialize measurement using X-Macro pattern from .def file
+                auto init_wld_id = device_id;
+                auto init_wtp_id = test.param_id;
+                auto init_wp_pos_x = (test.pixel_x != 0) ? test.pixel_x : default_x;
+                auto init_wp_pos_y = (test.pixel_y != 0) ? test.pixel_y : default_y;
+                auto init_wptm_value = value;
+                auto init_test_flag = test_flag;
+
+                // 🚀 NO SEGMENT TRACKING: Always set segment to 0 (much faster!)
+                auto init_segment = static_cast<uint8_t>(0);
+                auto init_file_hash = file_hash_;
+                auto init_wld_device_dmc = device_dmc;
+                auto init_wtp_param_name = test.cleaned_param_name;
+                auto init_units = test.units;
+                auto init_test_num = test.test_num;
+                auto init_test_flg = test.test_flg;
+
+                // X-Macro initialization - automatically assigns all fields from .def file
+                #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
+                    measurement.name = init_##name;
+
+                #include "../field_defs/measurement_fields.def"
+                #undef MEASUREMENT_FIELD
+
+                measurements.push_back(std::move(measurement));
+                measurements_created++;
+            }
+        }
+    }
+
+    std::cout << "✅ C++ cross-product (NO SEGMENTS) completed: " << measurements_created
+              << " measurements created" << std::endl;
+    std::cout << "🚀 SPEED BOOST: No segment tracking = much faster processing!" << std::endl;
+
     return measurements;
 }
 

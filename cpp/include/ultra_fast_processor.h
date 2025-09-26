@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <regex>
 #include "stdf_parser.h"
+#include "dynamic_field_extractor.h"
 
 /**
  * Ultra-Fast STDF to ClickHouse Processor
@@ -83,6 +84,9 @@ public:
     
     // Main processing function
     std::vector<MeasurementTuple> process_stdf_file(const std::string& filepath);
+
+    // 🚀 PURE SPEED: Process STDF file without file hash calculation and segment tracking
+    std::vector<MeasurementTuple> process_stdf_file_measurements(const std::string& filepath);
     
     // Configuration
     void set_enable_pixel_filtering(bool enable) { enable_pixel_filtering_ = enable; }
@@ -101,6 +105,13 @@ private:
     // Core processing functions
     MIRInfo extract_mir_info(const std::vector<STDFRecord>& mir_records);
     std::vector<MeasurementTuple> process_cross_product(
+        const std::vector<STDFRecord>& prr_records,
+        const std::vector<STDFRecord>& test_records,
+        const MIRInfo& mir_info
+    );
+
+    // 🚀 PURE SPEED: Cross-product without segment tracking (much faster)
+    std::vector<MeasurementTuple> process_cross_product_measurements(
         const std::vector<STDFRecord>& prr_records,
         const std::vector<STDFRecord>& test_records,
         const MIRInfo& mir_info
