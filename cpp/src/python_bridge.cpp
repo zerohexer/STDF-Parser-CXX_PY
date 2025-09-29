@@ -450,6 +450,136 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
     }
 }
 
+static PyObject* process_stdf_file_measurements(PyObject* self, PyObject* args) {
+    /**
+     * 🚀 PURE SPEED: Process STDF file for measurements only (no file hash, no segments)
+     * This is the fastest processing mode - perfect for pure measurement extraction
+     *
+     * Args: filepath (string)
+     * Returns: dict with measurement tuples and statistics
+     */
+    const char* filepath;
+
+    // Parse arguments: just the filepath
+    if (!PyArg_ParseTuple(args, "s", &filepath)) {
+        return nullptr;
+    }
+
+    try {
+        // Create ultra-fast processor
+        UltraFastProcessor processor;
+
+        std::cout << "🚀 PURE SPEED: Processing STDF file for measurements only" << std::endl;
+        std::cout << "   No file hash calculation, no segment tracking = maximum speed!" << std::endl;
+
+        // Process STDF file with pure measurement extraction
+        std::vector<MeasurementTuple> measurements = processor.process_stdf_file_measurements(std::string(filepath));
+
+        // Convert measurements to Python tuples (reuse existing code)
+        auto PyUnicode_FromString_Safe = [](const std::string& str) -> PyObject* {
+            return PyUnicode_FromString(str.c_str());
+        };
+
+        constexpr size_t TUPLE_SIZE = 0
+        #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) + 1
+        #include "../field_defs/measurement_fields.def"
+        #undef MEASUREMENT_FIELD
+        ;
+
+        PyObject* tuple_list = PyList_New(measurements.size());
+        if (!tuple_list) return nullptr;
+
+        for (size_t i = 0; i < measurements.size(); ++i) {
+            const auto& m = measurements[i];
+
+            PyObject* tuple = PyTuple_New(TUPLE_SIZE);
+            if (!tuple) {
+                Py_DECREF(tuple_list);
+                return nullptr;
+            }
+
+            size_t field_index = 0;
+            #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
+                PyTuple_SetItem(tuple, field_index++, python_conversion(m.name));
+
+            #include "../field_defs/measurement_fields.def"
+            #undef MEASUREMENT_FIELD
+
+            PyList_SetItem(tuple_list, i, tuple);
+        }
+
+        // Get ID mappings (no new mappings since we're not using database)
+        const auto& id_manager = processor.get_id_manager();
+        auto device_map = id_manager.get_device_map();
+        auto param_map = id_manager.get_param_map();
+
+        // Convert device mappings to Python list
+        PyObject* device_mappings_list = PyList_New(device_map.size());
+        if (!device_mappings_list) {
+            Py_DECREF(tuple_list);
+            return nullptr;
+        }
+
+        size_t dev_idx = 0;
+        for (const auto& pair : device_map) {
+            PyObject* device_tuple = PyTuple_New(2);
+            PyTuple_SetItem(device_tuple, 0, PyUnicode_FromString(pair.first.c_str()));
+            PyTuple_SetItem(device_tuple, 1, PyLong_FromUnsignedLong(pair.second));
+            PyList_SetItem(device_mappings_list, dev_idx++, device_tuple);
+        }
+
+        // Convert parameter mappings to Python list
+        PyObject* param_mappings_list = PyList_New(param_map.size());
+        if (!param_mappings_list) {
+            Py_DECREF(tuple_list);
+            Py_DECREF(device_mappings_list);
+            return nullptr;
+        }
+
+        size_t param_idx = 0;
+        for (const auto& pair : param_map) {
+            PyObject* param_tuple = PyTuple_New(2);
+            PyTuple_SetItem(param_tuple, 0, PyUnicode_FromString(pair.first.c_str()));
+            PyTuple_SetItem(param_tuple, 1, PyLong_FromUnsignedLong(pair.second));
+            PyList_SetItem(param_mappings_list, param_idx++, param_tuple);
+        }
+
+        std::cout << "🚀 PURE SPEED completed!" << std::endl;
+        std::cout << "   📊 Measurements: " << measurements.size() << std::endl;
+        std::cout << "   📊 Devices: " << device_map.size() << std::endl;
+        std::cout << "   📊 Parameters: " << param_map.size() << std::endl;
+
+        // Create result dictionary
+        PyObject* result_dict = PyDict_New();
+        if (!result_dict) {
+            Py_DECREF(tuple_list);
+            Py_DECREF(device_mappings_list);
+            Py_DECREF(param_mappings_list);
+            return nullptr;
+        }
+
+        PyDict_SetItemString(result_dict, "measurement_tuples", tuple_list);
+        PyDict_SetItemString(result_dict, "device_mappings", device_mappings_list);
+        PyDict_SetItemString(result_dict, "param_mappings", param_mappings_list);
+        PyDict_SetItemString(result_dict, "new_device_mappings", PyList_New(0)); // Empty - no database integration
+        PyDict_SetItemString(result_dict, "new_param_mappings", PyList_New(0));  // Empty - no database integration
+        PyDict_SetItemString(result_dict, "total_records", PyLong_FromSize_t(processor.get_total_records()));
+        PyDict_SetItemString(result_dict, "total_measurements", PyLong_FromSize_t(measurements.size()));
+        PyDict_SetItemString(result_dict, "parsing_time", PyFloat_FromDouble(processor.get_parsing_time()));
+        PyDict_SetItemString(result_dict, "processing_time", PyFloat_FromDouble(processor.get_processing_time()));
+
+        Py_DECREF(tuple_list);
+        Py_DECREF(device_mappings_list);
+        Py_DECREF(param_mappings_list);
+
+        return result_dict;
+
+    } catch (const std::exception& e) {
+        PyErr_SetString(PyExc_RuntimeError, e.what());
+        return nullptr;
+    }
+}
+
 // Method definitions
 static PyMethodDef StdfParserMethods[] = {
     {"parse_stdf_file", parse_stdf_file, METH_VARARGS,
@@ -460,6 +590,8 @@ static PyMethodDef StdfParserMethods[] = {
      "🚀 ULTRA-FAST: Process STDF to ClickHouse tuples entirely in C++"},
     {"process_stdf_with_database_mappings", process_stdf_with_database_mappings, METH_VARARGS,
      "🔧 DATABASE-AWARE: Process STDF with existing database mappings and optional file hash"},
+    {"process_stdf_file_measurements", process_stdf_file_measurements, METH_VARARGS,
+     "🚀 PURE SPEED: Process STDF file for measurements only (no file hash, no segments)"},
     {"get_version", get_version, METH_NOARGS,
      "Get version information"},
     {nullptr, nullptr, 0, nullptr}
