@@ -12,7 +12,7 @@ style: |
     --light-grey: #f5f5f5;
     --flow-bg: #f8f9fa;
     --box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    --base-font-size: 0.9em;
+    --base-font-size: 0.7em;
   }
 
   section {
@@ -387,7 +387,7 @@ else if (HEAD_TO_REC(rec->header) == REC_MPR) {
 
 ---
 
-# **X-Macro System: The Magic**
+# **X-Macro System**
 
 **Problem:** Writing field extraction code for 50+ fields × 7 record types = 350+ repetitive lines
 
@@ -843,6 +843,102 @@ with ProcessPoolExecutor(max_workers=3) as executor:
 
     print(f"Total: {total:,} measurements")
 ```
+
+---
+
+# **Accessing Measurement Data**
+
+**Python: Tuple Structure (13 Fields)**
+
+```python
+result = stdf_parser_cpp.process_stdf_file_measurements("test.stdf")
+measurements = result['measurement_tuples']
+for m in measurements:
+    # Option 1: Unpack all fields (correct order from measurement_fields.def)
+    wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, test_flag, segment, \
+    file_hash, wld_device_dmc, wtp_param_name, units, test_num, test_flg = m
+    print(f"Device: {wld_device_dmc} (ID: {wld_id})")
+    print(f"Parameter: {wtp_param_name} (ID: {wtp_id})")
+    print(f"Value: {wptm_value} {units}")
+    print(f"Position: X={wp_pos_x}, Y={wp_pos_y}")
+    print(f"Test: {test_num}, Flags: test_flag={test_flag}, test_flg={test_flg}") # Option 2: Access by index
+    print(f"{m[8]} | {m[9]} = {m[4]} {m[10]}")  # wld_device_dmc | wtp_param_name = wptm_value units
+```
+
+| Index | Field | C++ Type | Python Type | Description |
+|-------|-------|----------|-------------|-------------|
+| 0 | `wld_id` | uint32_t | int | Device numeric ID |
+| 1 | `wtp_id` | uint32_t | int | Parameter numeric ID |
+| 2 | `wp_pos_x` | int32_t | int | X coordinate (pixel tests) |
+| 3 | `wp_pos_y` | int32_t | int | Y coordinate (pixel tests) |
+| 4 | `wptm_value` | double | float | Measurement value |
+| 5 | `test_flag` | uint8_t | int | Test flag |
+| 6 | `segment` | uint8_t | int | Segment identifier |
+| 7 | `file_hash` | string | str | File hash |
+| 8 | `wld_device_dmc` | string | str | Device DMC string |
+| 9 | `wtp_param_name` | string | str | Parameter name |
+| 10 | `units` | string | str | Measurement units |
+| 11 | `test_num` | uint32_t | int | Test number |
+| 12 | `test_flg` | uint8_t | int | Test flag (from PTR/MPR/FTR record) |
+
+---
+
+**C++: MeasurementTuple Structure**
+
+```cpp
+#include "cpp/include/ultra_fast_processor.h"
+
+UltraFastProcessor processor;
+auto measurements = processor.process_stdf_file_measurements("test.stdf");
+
+// Each measurement is a MeasurementTuple struct
+for (const auto& m : measurements) {
+    // Direct field access via struct members (matches measurement_fields.def)
+    std::cout << "Device: " << m.wld_device_dmc
+              << " (ID: " << m.wld_id << ")\n";
+    std::cout << "Parameter: " << m.wtp_param_name
+              << " (ID: " << m.wtp_id << ")\n";
+    std::cout << "Value: " << m.wptm_value
+              << " " << m.units << "\n";
+    std::cout << "Position: X=" << m.wp_pos_x
+              << ", Y=" << m.wp_pos_y << "\n";
+    std::cout << "Test: " << m.test_num
+              << ", Flags: test_flag=" << (int)m.test_flag
+              << ", test_flg=" << (int)m.test_flg << "\n";
+}
+```
+
+**C++: MeasurementTuple Field Names (Auto-generated from measurement_fields.def)**
+
+```cpp
+struct MeasurementTuple {
+    uint32_t wld_id;             // Device numeric ID
+    uint32_t wtp_id;             // Parameter numeric ID
+    int32_t wp_pos_x;            // X coordinate (pixel tests)
+    int32_t wp_pos_y;            // Y coordinate (pixel tests)
+    double wptm_value;           // Measurement value
+    uint8_t test_flag;           // Test flag
+    uint8_t segment;             // Segment identifier (0-255)
+    std::string file_hash;       // File hash
+    std::string wld_device_dmc;  // Device DMC string
+    std::string wtp_param_name;  // Parameter name
+    std::string units;           // Measurement units
+    uint32_t test_num;           // Test number
+    uint8_t test_flg;            // Test flag (from PTR/MPR/FTR record)
+};
+```
+
+**Key Differences:**
+
+- **Python**: Returns tuples (immutable, index or unpack access)
+- **C++**: Returns structs (mutable, named field access)
+- **Same data**: Both contain identical measurement information
+- **Performance**: C++ struct access is slightly faster (direct memory access)
+
+**Note about `process_stdf_file_measurements`:**
+- `segment` field is always **0** (no segment tracking for speed)
+- `file_hash` field is always **"no_hash"** (no hash calculation for speed)
+- For full segment/hash support, use `process_stdf_with_database_mappings` instead
 
 ---
 
