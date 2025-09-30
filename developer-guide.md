@@ -561,13 +561,13 @@ Field extraction gives you access to ALL record fields via X-Macros. Measurement
 <strong>Key Point:</strong> Python ALWAYS calls C++ under the hood. Both extraction methods happen in the C++ layer - Python just receives the populated <code>fields</code> dictionary regardless of whether C++ used X-Macros or manual code.
 </div>
 
-**Comparison:**
 
 | Approach | How It Works (C++ Layer) | Adding New Field | Consistency | Python Access |
 |----------|--------------------------|------------------|-------------|---------------|
-| **X-Macro (.def files)** | `FIELD("TEST_NUM", TEST_NUM)` in .def → C++ automatic | Edit 1 line in .def file | ✅ UPPERCASE, no duplicates | `fields['TEST_NUM']` |
-| **Manual (Direct code)** | `record.fields["test_num"] = std::to_string(ptr->TEST_NUM);` in C++ | Write C++ code, rebuild | ⚠️ lowercase/UPPERCASE conflicts | `fields['test_num']` |
+| **X-Macro (.def files)** | `FIELD("TEST_NUM", TEST_NUM)` in .def → C++ automatic | Edit 1 line in .def file |  UPPERCASE, no duplicates | `fields['TEST_NUM']` |
+| **Manual (Direct code)** | `record.fields["test_num"] = std::to_string(ptr->TEST_NUM);` in C++ | Write C++ code, rebuild |  lowercase/UPPERCASE conflicts | `fields['test_num']` |
 
+---
 **X-Macro Extraction Example (.def file):**
 
 ```cpp
@@ -865,10 +865,7 @@ Edit <code>ultra_fast_processor.cpp</code> → Update cross-product logic → Re
 Check <code>stdf_parser.cpp::parse_record()</code> → Verify record type routing → Inspect field extraction
 </div>
 
-<div class="process-box">
-<span class="step-number">4</span><strong>Performance Profiling</strong><br>
-Use timing output → Identify bottlenecks → Optimize hot paths
-</div>
+<br>
 
 **Key Files for Developers:**
 - **Field Definitions:** `cpp/field_defs/*.def`
