@@ -923,8 +923,6 @@ struct MeasurementTuple {
     uint32_t wld_id;             // Device numeric ID
     uint32_t wtp_id;             // Parameter numeric ID
     int32_t wp_pos_x;            // X coordinate (pixel tests)
-    int32_t wp_pos_y;            // Y coordinate (pixel tests)
-    double wptm_value;           // Measurement value
     //...... others
 ```
 
