@@ -20,6 +20,21 @@ stdf_parser_extension = Extension(
         sysconfig.get_path('include'),  # Python headers
         '/usr/local/include',  # Standard include path
     ],
+    depends=[
+        # X-Macros field definition files - setuptools will track changes
+        'cpp/field_defs/ptr_fields.def',
+        'cpp/field_defs/mpr_fields.def',
+        'cpp/field_defs/ftr_fields.def',
+        'cpp/field_defs/hbr_fields.def',
+        'cpp/field_defs/sbr_fields.def',
+        'cpp/field_defs/prr_fields.def',
+        'cpp/field_defs/mir_fields.def',
+        'cpp/field_defs/measurement_fields.def',
+        # Header files
+        'cpp/include/stdf_parser.h',
+        'cpp/include/dynamic_field_extractor.h',
+        'cpp/include/ultra_fast_processor.h',
+    ],
     library_dirs=[
         'cpp/third_party/lib',  # For libstdf library when we add it
         '/usr/local/lib',  # Standard library path
@@ -94,6 +109,7 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Programming Language :: C++',
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development :: Libraries',

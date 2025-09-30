@@ -31,6 +31,21 @@ if platform.system() == "Windows":
             'cpp/include',
             'cpp/third_party_windows/include',  # Use Windows libstdf headers
         ],
+        'depends': [
+            # X-Macros field definition files - setuptools will track changes
+            'cpp/field_defs/ptr_fields.def',
+            'cpp/field_defs/mpr_fields.def',
+            'cpp/field_defs/ftr_fields.def',
+            'cpp/field_defs/hbr_fields.def',
+            'cpp/field_defs/sbr_fields.def',
+            'cpp/field_defs/prr_fields.def',
+            'cpp/field_defs/mir_fields.def',
+            'cpp/field_defs/measurement_fields.def',
+            # Header files
+            'cpp/include/stdf_parser.h',
+            'cpp/include/dynamic_field_extractor.h',
+            'cpp/include/ultra_fast_processor.h',
+        ],
         'extra_objects': [
             'cpp/third_party_windows/lib/libstdf.a',  # Use Windows static library
         ],
