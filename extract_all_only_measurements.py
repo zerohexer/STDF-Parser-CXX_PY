@@ -3,7 +3,7 @@ import platform
 import time
 import sys
 import glob
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 # Platform setup for C++ library
@@ -40,11 +40,11 @@ def find_stdf_files(path):
     if path_obj.is_file():
         return [str(path_obj)]
     elif path_obj.is_dir():
-        # Find all .stdf files in directory
-        stdf_files = []
-        stdf_files.extend(glob.glob(os.path.join(path, "*.stdf")))
-        stdf_files.extend(glob.glob(os.path.join(path, "*.STDF")))
-        return stdf_files
+        # Use set to avoid duplicates on Windows (case-insensitive filesystem)
+        stdf_files = set()
+        stdf_files.update(path_obj.glob("*.stdf"))
+        stdf_files.update(path_obj.glob("*.STDF"))
+        return [str(f) for f in stdf_files]
     else:
         return []
 
@@ -76,11 +76,11 @@ def main():
             print(f"File: {measurements:,} measurements ({file_time:.2f}s)")
 
     else:
-        # Multiple files - parallel processing with controlled threads
+        # Multiple files - parallel processing with controlled processes
         MAX_WORKERS = 3  # Limit to avoid memory issues
         print(f"Parallel mode: {len(files)} files with {MAX_WORKERS} workers")
 
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
             # Submit all files
             future_to_file = {executor.submit(process_single_file, file): file for file in files}
 
