@@ -848,22 +848,7 @@ with ProcessPoolExecutor(max_workers=3) as executor:
 
 # **Accessing Measurement Data**
 
-**Python: Tuple Structure (13 Fields)**
 
-```python
-result = stdf_parser_cpp.process_stdf_file_measurements("test.stdf")
-measurements = result['measurement_tuples']
-for m in measurements:
-    # Option 1: Unpack all fields (correct order from measurement_fields.def)
-    wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, test_flag, segment, \
-    file_hash, wld_device_dmc, wtp_param_name, units, test_num, test_flg = m
-    print(f"Device: {wld_device_dmc} (ID: {wld_id})")
-    print(f"Parameter: {wtp_param_name} (ID: {wtp_id})")
-    print(f"Value: {wptm_value} {units}")
-    print(f"Position: X={wp_pos_x}, Y={wp_pos_y}")
-    print(f"Test: {test_num}, Flags: test_flag={test_flag}, test_flg={test_flg}") # Option 2: Access by index
-    print(f"{m[8]} | {m[9]} = {m[4]} {m[10]}")  # wld_device_dmc | wtp_param_name = wptm_value units
-```
 
 | Index | Field | C++ Type | Python Type | Description |
 |-------|-------|----------|-------------|-------------|
@@ -881,8 +866,31 @@ for m in measurements:
 | 11 | `test_num` | uint32_t | int | Test number |
 | 12 | `test_flg` | uint8_t | int | Test flag (from PTR/MPR/FTR record) |
 
+**Key Differences:**
+
+- **Python**: Returns tuples (immutable, index or unpack access)
+- **C++**: Returns structs (mutable, named field access)
+- **Same data**: Both contain identical measurement information
+- **Performance**: C++ struct access is slightly faster (direct memory access)
 ---
 
+**Python: Tuple Structure**
+
+```python
+result = stdf_parser_cpp.process_stdf_file_measurements("test.stdf")
+measurements = result['measurement_tuples']
+for m in measurements:
+    # Option 1: Unpack all fields (correct order from measurement_fields.def)
+    wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, test_flag, segment, \
+    file_hash, wld_device_dmc, wtp_param_name, units, test_num, test_flg = m
+    print(f"Device: {wld_device_dmc} (ID: {wld_id})")
+    print(f"Parameter: {wtp_param_name} (ID: {wtp_id})")
+    print(f"Value: {wptm_value} {units}")
+    print(f"Position: X={wp_pos_x}, Y={wp_pos_y}")
+    print(f"Test: {test_num}, Flags: test_flag={test_flag}, test_flg={test_flg}") 
+    # Option 2: Access by index
+    print(f"{m[8]} | {m[9]} = {m[4]} {m[10]}")  # wld_device_dmc | wtp_param_name = wptm_value units
+```
 **C++: MeasurementTuple Structure**
 
 ```cpp
@@ -928,17 +936,8 @@ struct MeasurementTuple {
 };
 ```
 
-**Key Differences:**
 
-- **Python**: Returns tuples (immutable, index or unpack access)
-- **C++**: Returns structs (mutable, named field access)
-- **Same data**: Both contain identical measurement information
-- **Performance**: C++ struct access is slightly faster (direct memory access)
 
-**Note about `process_stdf_file_measurements`:**
-- `segment` field is always **0** (no segment tracking for speed)
-- `file_hash` field is always **"no_hash"** (no hash calculation for speed)
-- For full segment/hash support, use `process_stdf_with_database_mappings` instead
 
 ---
 
