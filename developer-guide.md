@@ -792,7 +792,8 @@ for (auto& future : futures) {
 }
 ```
 
-**Build:** `g++ -O3 -std=c++14 stdf_measurement_extraction_example.cpp -Lcpp/third_party/lib -lstdf`
+**Build:** `g++ -std=c++17 -O3 -DWIN32 -DNDEBUG -I cpp/include -I cpp/third_party_windows/include stdf_measurement_extraction_example.cpp cpp/src/dynamic_field_extractor.cpp cpp/src/stdf_parser.cpp cpp/src/ultra_fast_processor.cpp cpp/third_party_windows/lib/libstdf.a -static-libgcc -static-libstdc++ -o stdf_measurement_extraction_example.exe
+`
 
 ---
 
@@ -970,7 +971,7 @@ Check <code>stdf_parser.cpp::parse_record()</code> → Verify record type routin
 - **UltraFastProcessor** - Measurement creation, ID mapping
 
 **Performance:**
-- Single file: 3-6 seconds for 30-35 MB files (340K-448K measurements/sec)
+- Single file: 5-13 seconds for 30-35 MB files (340K-448K measurements/sec)
 - Parallel (Python): 177 MB (6 files, 17.3M measurements) in 20.29 seconds
 - Parallel speedup: 3.3x with ProcessPoolExecutor (Python) or std::async (C++)
 
