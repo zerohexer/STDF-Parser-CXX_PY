@@ -925,15 +925,7 @@ struct MeasurementTuple {
     int32_t wp_pos_x;            // X coordinate (pixel tests)
     int32_t wp_pos_y;            // Y coordinate (pixel tests)
     double wptm_value;           // Measurement value
-    uint8_t test_flag;           // Test flag
-    uint8_t segment;             // Segment identifier (0-255)
-    std::string file_hash;       // File hash
-    std::string wld_device_dmc;  // Device DMC string
-    std::string wtp_param_name;  // Parameter name
-    std::string units;           // Measurement units
-    uint32_t test_num;           // Test number
-    uint8_t test_flg;            // Test flag (from PTR/MPR/FTR record)
-};
+    //...... others
 ```
 
 
