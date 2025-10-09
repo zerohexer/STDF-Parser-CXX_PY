@@ -24,13 +24,16 @@ struct MeasurementTuple {
     // Define MEASUREMENT_FIELD macro to generate struct members
     #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
         cpp_type name;
-    
+
     // Include all fields from measurement_fields.def
     #include "../field_defs/measurement_fields.def"
-    
+
     // Undefine the macro
     #undef MEASUREMENT_FIELD
-    
+
+    // 🚀 RUNTIME FLEXIBLE: Extra fields specified by Python at runtime
+    std::unordered_map<std::string, std::string> extra_fields;
+
     // Constructor for easy initialization
     MeasurementTuple() = default;
 };
@@ -91,6 +94,11 @@ public:
     // Configuration
     void set_enable_pixel_filtering(bool enable) { enable_pixel_filtering_ = enable; }
     void set_file_hash(const std::string& hash) { file_hash_ = hash; }
+
+    // 🚀 RUNTIME FLEXIBLE: Set which extra fields to extract
+    void set_extra_fields(const std::vector<std::pair<std::string, std::vector<std::string>>>& fields) {
+        extra_fields_spec_ = fields;
+    }
     
     // Statistics
     size_t get_total_records() const { return total_records_; }
@@ -133,11 +141,21 @@ private:
     // Utility functions
     std::string calculate_file_hash(const std::string& filepath);
     uint8_t calculate_test_flag(const STDFRecord& prr_record);
+
+    // 🚀 RUNTIME FLEXIBLE: Build lookup for extra fields
+    std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>>
+    build_extra_fields_lookup(const std::vector<STDFRecord>& records);
+
+    // Helper: Convert string to STDFRecordType
+    STDFRecordType string_to_record_type(const std::string& type_str);
     
     // Configuration
     bool enable_pixel_filtering_;
     std::string file_hash_;
-    
+
+    // 🚀 RUNTIME FLEXIBLE: Extra fields specification from Python
+    std::vector<std::pair<std::string, std::vector<std::string>>> extra_fields_spec_;
+
     // ID management
     FastIDManager id_manager_;
     

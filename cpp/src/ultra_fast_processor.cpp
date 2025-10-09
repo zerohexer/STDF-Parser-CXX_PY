@@ -254,9 +254,15 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
     size_t estimated_size = prr_records.size() * test_records.size() * 3; // Estimate 3 values per test
     measurements.reserve(estimated_size);
     
-    std::cout << "🚀 C++ cross-product: " << prr_records.size() << " devices × " 
+    std::cout << "🚀 C++ cross-product: " << prr_records.size() << " devices × "
               << test_records.size() << " tests = ~" << estimated_size << " estimated measurements" << std::endl;
-    
+
+    // 🚀 RUNTIME FLEXIBLE: Build extra fields lookup if specified
+    std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>> extra_fields_lookup;
+    if (!extra_fields_spec_.empty()) {
+        extra_fields_lookup = build_extra_fields_lookup(test_records);
+    }
+
     // Pre-process test records with pixel filtering
     struct ProcessedTest {
         std::vector<double> values;
@@ -394,17 +400,25 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
                 // X-Macro initialization - automatically assigns all fields from .def file
                 #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
                     measurement.name = init_##name;
-                
+
                 #include "../field_defs/measurement_fields.def"
                 #undef MEASUREMENT_FIELD
-                
+
+                // 🚀 RUNTIME FLEXIBLE: Add extra fields from lookup (C++ hash map - FAST!)
+                if (!extra_fields_lookup.empty()) {
+                    auto extra_it = extra_fields_lookup.find(test.test_num);
+                    if (extra_it != extra_fields_lookup.end()) {
+                        measurement.extra_fields = extra_it->second;  // Copy extra fields
+                    }
+                }
+
                 measurements.push_back(std::move(measurement));
                 measurements_created++;
             }
         }
     }
-    
-    std::cout << "✅ C++ cross-product completed: " << measurements_created 
+
+    std::cout << "✅ C++ cross-product completed: " << measurements_created
               << " measurements created" << std::endl;
     std::cout << "🔢 Segment tracking: " << duplicate_tracker.size() 
               << " unique coordinate combinations tracked" << std::endl;
@@ -430,6 +444,15 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
 
     std::cout << "🚀 C++ cross-product (NO SEGMENTS): " << prr_records.size() << " devices × "
               << test_records.size() << " tests = ~" << estimated_size << " estimated measurements" << std::endl;
+
+    // 🚀 RUNTIME FLEXIBLE: Build extra fields lookup if specified
+    std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>> extra_fields_lookup;
+    if (!extra_fields_spec_.empty()) {
+        // Build lookup from ALL records (need access to all record types)
+        // Note: test_records only contains PTR/MPR/FTR, so we need to pass all records
+        // For now, build from test_records (contains PTR/MPR/FTR)
+        extra_fields_lookup = build_extra_fields_lookup(test_records);
+    }
 
     // Pre-process test records with pixel filtering
     struct ProcessedTest {
@@ -559,6 +582,14 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
 
                 #include "../field_defs/measurement_fields.def"
                 #undef MEASUREMENT_FIELD
+
+                // 🚀 RUNTIME FLEXIBLE: Add extra fields from lookup (C++ hash map - FAST!)
+                if (!extra_fields_lookup.empty()) {
+                    auto extra_it = extra_fields_lookup.find(test.test_num);
+                    if (extra_it != extra_fields_lookup.end()) {
+                        measurement.extra_fields = extra_it->second;  // Copy extra fields
+                    }
+                }
 
                 measurements.push_back(std::move(measurement));
                 measurements_created++;
@@ -776,15 +807,79 @@ uint8_t UltraFastProcessor::calculate_test_flag(const STDFRecord& prr_record) {
         auto it = prr_record.fields.find(key);
         return (it != prr_record.fields.end()) ? it->second : "";
     };
-    
+
     std::string bin_code = get_field("SOFT_BIN");
     if (bin_code.empty()) {
         bin_code = get_field("HARD_BIN");
     }
-    
+
     try {
         return (std::stoi(bin_code) == 1) ? 1 : 0;
     } catch (...) {
         return 0;
     }
+}
+
+// 🚀 RUNTIME FLEXIBLE: Convert string to STDFRecordType
+STDFRecordType UltraFastProcessor::string_to_record_type(const std::string& type_str) {
+    if (type_str == "PTR") return STDFRecordType::PTR;
+    if (type_str == "MPR") return STDFRecordType::MPR;
+    if (type_str == "FTR") return STDFRecordType::FTR;
+    if (type_str == "PRR") return STDFRecordType::PRR;
+    if (type_str == "MIR") return STDFRecordType::MIR;
+    if (type_str == "HBR") return STDFRecordType::HBR;
+    if (type_str == "SBR") return STDFRecordType::SBR;
+    return STDFRecordType::UNKNOWN;
+}
+
+// 🚀 RUNTIME FLEXIBLE: Build lookup for extra fields from specification
+std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>>
+UltraFastProcessor::build_extra_fields_lookup(const std::vector<STDFRecord>& records) {
+    std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>> lookup;
+
+    if (extra_fields_spec_.empty()) {
+        return lookup;  // No extra fields requested
+    }
+
+    std::cout << "🚀 Building extra fields lookup..." << std::endl;
+
+    // For each extra field specification: ('FTR', ['VECT_NAM', 'TIME_SET', 'OP_CODE'])
+    for (const auto& [record_type_str, field_names] : extra_fields_spec_) {
+        STDFRecordType target_type = string_to_record_type(record_type_str);
+
+        if (target_type == STDFRecordType::UNKNOWN) {
+            std::cerr << "⚠️  Unknown record type: " << record_type_str << std::endl;
+            continue;
+        }
+
+        size_t matched_records = 0;
+
+        // Find matching records
+        for (const auto& rec : records) {
+            if (rec.type == target_type) {
+                uint32_t test_num = rec.test_num;
+
+                // Extract requested fields
+                for (const auto& field_name : field_names) {
+                    auto it = rec.fields.find(field_name);
+                    if (it != rec.fields.end()) {
+                        lookup[test_num][field_name] = it->second;
+                    } else {
+                        // Field not found - set empty string
+                        lookup[test_num][field_name] = "";
+                    }
+                }
+
+                matched_records++;
+            }
+        }
+
+        std::cout << "   ✅ " << record_type_str << ": Extracted "
+                  << field_names.size() << " fields from "
+                  << matched_records << " records" << std::endl;
+    }
+
+    std::cout << "   📋 Total lookup entries: " << lookup.size() << std::endl;
+
+    return lookup;
 }
