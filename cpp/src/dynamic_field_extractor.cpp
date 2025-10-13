@@ -3,21 +3,22 @@
 #include <iostream>
 #include <sstream>
 
-DynamicFieldExtractor::DynamicFieldExtractor(const std::string& config_file) 
+DynamicFieldExtractor::DynamicFieldExtractor(const std::string& config_file)
     : config_file_path_(config_file) {
-    
+
     // NO CONFIG FILES - Extract ALL fields from .def files automatically
     std::cout << "DynamicFieldExtractor: Extracting ALL fields from .def files" << std::endl;
-    
-    // Enable ALL fields from each .def file
-    enabled_fields_["PTR"] = get_all_available_fields("PTR");
-    enabled_fields_["MPR"] = get_all_available_fields("MPR");
-    enabled_fields_["FTR"] = get_all_available_fields("FTR");
-    enabled_fields_["HBR"] = get_all_available_fields("HBR");
-    enabled_fields_["SBR"] = get_all_available_fields("SBR");
-    enabled_fields_["PRR"] = get_all_available_fields("PRR");
-    enabled_fields_["MIR"] = get_all_available_fields("MIR");
-    
+
+    // ========================================================================
+    // HYBRID APPROACH: Auto-enable all record types from registry
+    // ========================================================================
+    // X-Macro generates initialization from record_types.def
+    #define RECORD_TYPE(name, ...) \
+        enabled_fields_[#name] = get_all_available_fields(#name);
+
+    #include "../field_defs/record_types.def"
+    #undef RECORD_TYPE
+
     print_configuration_summary();
 }
 

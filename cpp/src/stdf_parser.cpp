@@ -11,20 +11,16 @@
 // Global shared DynamicFieldExtractor (created once, reused everywhere)
 static DynamicFieldExtractor g_field_extractor;
 
-STDFParser::STDFParser() 
+STDFParser::STDFParser()
     : stdf_file_handle_(nullptr)
     , total_records_(0)
     , parsed_records_(0) {
-    
-    // Enable common record types by default
+
+    // Enable common record types by default - auto-generated from registry
     enabled_types_ = {
-        STDFRecordType::PTR,
-        STDFRecordType::MPR,
-        STDFRecordType::FTR,
-        STDFRecordType::HBR,
-        STDFRecordType::SBR,
-        STDFRecordType::MIR,
-        STDFRecordType::PRR
+        #define RECORD_TYPE(name, ...) STDFRecordType::name,
+        #include "../field_defs/record_types.def"
+        #undef RECORD_TYPE
     };
 }
 
@@ -132,37 +128,86 @@ void STDFParser::create_sample_records(std::vector<STDFRecord>& results) {
     parsed_records_ = 2;
 }
 
+// ============================================================================
+// HYBRID APPROACH: Generic Template Parser
+// ============================================================================
+// ONE template handles ALL record types - no duplication!
+template<typename RecordStruct, int LibstdfMacro>
+STDFRecord STDFParser::parse_generic_record(void* raw_record, STDFRecordType type, const char* type_name) {
+    STDFRecord record;
+    record.type = type;
+
+    rec_unknown* rec = static_cast<rec_unknown*>(raw_record);
+
+    // Store header info
+    record.rec_type = rec->header.REC_TYP;
+    record.rec_subtype = rec->header.REC_SUB;
+    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
+    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
+    record.fields["RECORD_TYPE"] = type_name;
+
+    try {
+        // Check if it's actually the expected record type using libstdf macros
+        if (HEAD_TO_REC(rec->header) == LibstdfMacro) {
+            // Cast to specific type
+            RecordStruct* typed_rec = (RecordStruct*)rec;
+
+            // Extract ALL fields using global shared extractor
+            DynamicSTDFRecord dynamic_record;
+            g_field_extractor.extract_fields(typed_rec, dynamic_record);
+
+            // Copy ALL extracted fields from X-Macros to main record
+            for (const auto& field : dynamic_record.fields) {
+                record.fields[field.first] = field.second;
+            }
+
+            static int debug_count = 0;
+            if (debug_count < 2 && type == STDFRecordType::PTR) {
+                std::cout << type_name << " generic parser: Extracted "
+                          << dynamic_record.fields.size() << " fields" << std::endl;
+                debug_count++;
+            }
+        } else {
+            std::cerr << "Warning: Record header mismatch in parse_generic_record for "
+                      << type_name << std::endl;
+        }
+
+    } catch (const std::exception& e) {
+        std::cerr << "Exception in parse_generic_record (" << type_name << "): "
+                  << e.what() << std::endl;
+        record.fields["ERROR"] = e.what();
+    }
+
+    return record;
+}
+
+// ============================================================================
+// Auto-generated Switch - Uses X-Macros but keeps template calls explicit
+// ============================================================================
 STDFRecord STDFParser::parse_record(void* raw_record, STDFRecordType type) {
     STDFRecord record;
     record.type = type;
-    
+
     rec_unknown* rec = static_cast<rec_unknown*>(raw_record);
     record.rec_type = rec->header.REC_TYP;
     record.rec_subtype = rec->header.REC_SUB;
-    
-    // Parse based on record type - ALL ENABLED: Safe parsing for all types
+
+    // X-Macro generates switch cases from record_types.def
     switch (type) {
-        case STDFRecordType::MIR:
-            return parse_mir_record(raw_record);
-        case STDFRecordType::PTR:
-            return parse_ptr_record(raw_record);  // Enable PTR parser
-        case STDFRecordType::MPR:
-            return parse_mpr_record(raw_record);  // Enable MPR parser
-        case STDFRecordType::FTR:
-            return parse_ftr_record(raw_record);  // Enable FTR parser
-        case STDFRecordType::HBR:
-            return parse_hbr_record(raw_record);  // Enable HBR parser
-        case STDFRecordType::SBR:
-            return parse_sbr_record(raw_record);  // Enable SBR parser
-        case STDFRecordType::PRR:
-            return parse_prr_record(raw_record);  // Enable PRR parser
+        #define RECORD_TYPE(name, struct_type, typ, sub, macro) \
+            case STDFRecordType::name: \
+                return parse_generic_record<struct_type, macro>(raw_record, type, #name);
+
+        #include "../field_defs/record_types.def"
+        #undef RECORD_TYPE
+
         default:
-            // For unsupported record types, store basic info
+            // Unknown record type
             record.fields["REC_TYPE"] = std::to_string(record.rec_type);
             record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
             break;
     }
-    
+
     return record;
 }
 
@@ -184,16 +229,17 @@ void STDFParser::close_stdf_file() {
     }
 }
 
+// ============================================================================
+// Auto-generated Record Type Detection - from field_defs/record_types.def
+// ============================================================================
 STDFRecordType STDFParser::get_record_type(uint8_t rec_typ, uint8_t rec_sub) {
-    // STDF V4 record type mapping (corrected per libstdf specification)
-    if (rec_typ == 15 && rec_sub == 10) return STDFRecordType::PTR;  // Parametric Test Record (REC_SUB_PTR = 10)
-    if (rec_typ == 15 && rec_sub == 15) return STDFRecordType::MPR;  // Multiple-Result Parametric Record (REC_SUB_MPR = 15)
-    if (rec_typ == 15 && rec_sub == 20) return STDFRecordType::FTR;  // Functional Test Record (REC_SUB_FTR = 20)
-    if (rec_typ == 1 && rec_sub == 40)  return STDFRecordType::HBR;  // Hardware Bin Record
-    if (rec_typ == 1 && rec_sub == 50)  return STDFRecordType::SBR;  // Software Bin Record
-    if (rec_typ == 5 && rec_sub == 20)  return STDFRecordType::PRR;  // Part Result Record
-    if (rec_typ == 1 && rec_sub == 10)  return STDFRecordType::MIR;  // Master Information Record
-    
+    // X-Macro generates if-else chain from record_types.def
+    #define RECORD_TYPE(name, struct_type, typ, sub, macro) \
+        if (rec_typ == typ && rec_sub == sub) return STDFRecordType::name;
+
+    #include "../field_defs/record_types.def"
+    #undef RECORD_TYPE
+
     return STDFRecordType::UNKNOWN;
 }
 
@@ -213,457 +259,3 @@ void STDFParser::set_field_config(const std::string& config_json) {
     // This would determine which fields to extract for each record type
 }
 
-// Record-specific parsers using libstdf structures
-
-STDFRecord STDFParser::parse_ptr_record(void* ptr_rec) {
-    static int ptr_count = 0;
-    ptr_count++;
-    if (ptr_count <= 3) printf("PTR Parser called #%d\n", ptr_count);
-    
-    STDFRecord record;
-    record.type = STDFRecordType::PTR;
-    
-    rec_unknown* rec = static_cast<rec_unknown*>(ptr_rec);
-    
-    if (ptr_count <= 3) printf("rec pointer: %p\n", rec);
-    
-    // Store header info safely
-    record.rec_type = rec->header.REC_TYP;
-    record.rec_subtype = rec->header.REC_SUB;
-    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
-    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
-    record.fields["RECORD_TYPE"] = "PTR";
-    
-    // PROPER LIBSTDF APPROACH: Direct casting (as shown in libstdf examples)
-    // This is the official way according to dump_records_to_ascii.c
-    try {
-        // Check if it's actually a PTR record using libstdf macros
-        if (HEAD_TO_REC(rec->header) == REC_PTR) {
-            // Official libstdf approach: cast rec_unknown* to rec_ptr*
-            rec_ptr* ptr = (rec_ptr*)rec;
-            
-            static int debug_count = 0;
-            if (debug_count < 2) {
-                printf("\n=== PTR Proper Extraction #%d ===\n", debug_count + 1);
-                printf("Using official libstdf casting approach\n");
-                debug_count++;
-            }
-            
-            // Extract all PTR fields using global shared extractor
-            DynamicSTDFRecord dynamic_record;
-            g_field_extractor.extract_fields(ptr, dynamic_record);
-            
-            // Copy ALL extracted fields from X-Macros to main record
-            for (const auto& field : dynamic_record.fields) {
-                record.fields[field.first] = field.second;
-            }
-            
-            // Note: test_num, head_num, site_num, result now handled by .def files
-            // Removed duplicate assignments to avoid field conflicts
-          
-        }
-    } catch (...) {
-        // If casting fails, continue with basic approach
-        printf("PTR casting failed, using basic approach\n");
-    }
-    
-    if (false) {  // Disable old approach
-        uint8_t* raw_data = static_cast<uint8_t*>(rec->data);
-        
-        static int debug_count = 0;
-        if (debug_count < 2) {  // Only debug first 2 PTR records
-            printf("\n=== PTR Debug #%d ===\n", debug_count + 1);
-            printf("Length: %d bytes\n", rec->header.REC_LEN);
-            printf("Data pointer: %p\n", rec->data);
-            
-            // HYPOTHESIS: Maybe rec->data doesn't point to the actual record data
-            // Let's try a different approach based on libstdf documentation
-            printf("Record state: %d\n", rec->header.state);
-            printf("Investigating data structure...\n");
-            
-            // Maybe we need to cast the entire rec_unknown to rec_ptr?
-            // But we know this is dangerous - let's just skip memory access for now
-            printf("SKIPPING direct memory access for safety\n");
-            
-            // Try to interpret the bytes according to STDF PTR spec:
-            // TEST_NUM (U4) - 4 bytes
-            // HEAD_NUM (U1) - 1 byte  
-            // SITE_NUM (U1) - 1 byte
-            // TEST_FLG (B1) - 1 byte ← TARGET!
-            // PARM_FLG (B1) - 1 byte
-            // RESULT (R4) - 4 bytes
-            
-            if (rec->header.REC_LEN >= 8) {
-                uint32_t test_num = *reinterpret_cast<uint32_t*>(raw_data + 0);
-                uint8_t head_num = raw_data[4];
-                uint8_t site_num = raw_data[5]; 
-                uint8_t test_flg = raw_data[6];  // ← This is what we want!
-                uint8_t parm_flg = raw_data[7];
-                
-                printf("Fields: TEST_NUM=%u HEAD=%d SITE=%d TEST_FLG=%d PARM_FLG=%d\n", 
-                       test_num, head_num, site_num, test_flg, parm_flg);
-                
-                if (rec->header.REC_LEN >= 12) {
-                    float result = *reinterpret_cast<float*>(raw_data + 8);
-                    printf("RESULT=%.6f\n", result);
-                }
-            }
-            debug_count++;
-        }
-        
-        // If debugging looks correct, extract the fields for real
-        if (rec->header.REC_LEN >= 8) {
-            try {
-                uint32_t test_num = *reinterpret_cast<uint32_t*>(raw_data + 0);
-                uint8_t head_num = raw_data[4];
-                uint8_t site_num = raw_data[5];
-                uint8_t test_flg = raw_data[6];  // ← The field you want!
-                uint8_t parm_flg = raw_data[7];
-                
-                // Store in fields map
-                record.fields["test_num"] = std::to_string(test_num);
-                record.fields["head_num"] = std::to_string(head_num); 
-                record.fields["site_num"] = std::to_string(site_num);
-                record.fields["test_flg"] = std::to_string(test_flg);
-                record.fields["parm_flg"] = std::to_string(parm_flg);
-                
-                // Store in record structure
-                // Note: test_num, head_num, site_num now handled by .def files
-                
-                if (rec->header.REC_LEN >= 12) {
-                    float result = *reinterpret_cast<float*>(raw_data + 8);
-                    record.fields["result"] = std::to_string(result);
-                    // Note: result now handled by .def files
-                }
-                
-            } catch (...) {
-                // If parsing fails, just use basic info
-            }
-        }
-    }
-    
-    return record;
-}
-
-STDFRecord STDFParser::parse_mpr_record(void* mpr_rec) {
-    STDFRecord record;
-    record.type = STDFRecordType::MPR;
-    
-    rec_unknown* rec = static_cast<rec_unknown*>(mpr_rec);
-    
-    // Store header info safely
-    record.rec_type = rec->header.REC_TYP;
-    record.rec_subtype = rec->header.REC_SUB;
-    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
-    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
-    record.fields["RECORD_TYPE"] = "MPR";
-    
-    // PROPER LIBSTDF APPROACH: Direct casting (as shown in libstdf examples)
-    try {
-        // Check if it's actually a MPR record using libstdf macros
-        if (HEAD_TO_REC(rec->header) == REC_MPR) {
-            // Official libstdf approach: cast rec_unknown* to rec_mpr*
-            rec_mpr* mpr = (rec_mpr*)rec;
-            
-            // Extract ALL MPR fields using global shared extractor
-            DynamicSTDFRecord dynamic_record;
-            g_field_extractor.extract_fields(mpr, dynamic_record);
-            
-            // Copy ALL extracted fields from X-Macros to main record
-            for (const auto& field : dynamic_record.fields) {
-                record.fields[field.first] = field.second;
-            }
-            
-            // Store in record structure for compatibility
-            // Note: test_num, head_num, site_num now handled by .def files
-            
-            // Note: TEST_TXT and ALARM_ID now handled by .def files
-            
-            // Note: All scale fields now handled by .def files
-            record.fields["start_in"] = std::to_string(mpr->START_IN);
-            record.fields["incr_in"] = std::to_string(mpr->INCR_IN);
-            
-            // Extract result arrays if present
-            if (mpr->RTN_STAT && mpr->RSLT_CNT > 0) {
-                // Note: RTN_STAT and RTN_RSLT are arrays - for now just store count
-                record.fields["rtn_stat_count"] = std::to_string(mpr->RSLT_CNT);
-            }
-        }
-    } catch (...) {
-        // If casting fails, continue with basic approach
-    }
-    
-    return record;
-}
-
-STDFRecord STDFParser::parse_ftr_record(void* ftr_rec) {
-    STDFRecord record;
-    record.type = STDFRecordType::FTR;
-    
-    rec_unknown* rec = static_cast<rec_unknown*>(ftr_rec);
-    
-    // Store header info safely
-    record.rec_type = rec->header.REC_TYP;
-    record.rec_subtype = rec->header.REC_SUB;
-    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
-    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
-    record.fields["RECORD_TYPE"] = "FTR";
-    
-    // PROPER LIBSTDF APPROACH: Direct casting (as shown in libstdf examples)
-    try {
-        // Check if it's actually a FTR record using libstdf macros
-        if (HEAD_TO_REC(rec->header) == REC_FTR) {
-            // Official libstdf approach: cast rec_unknown* to rec_ftr*
-            rec_ftr* ftr = (rec_ftr*)rec;
-            
-            // Extract ALL FTR fields using global shared extractor
-            DynamicSTDFRecord dynamic_record;
-            g_field_extractor.extract_fields(ftr, dynamic_record);
-            
-            // Copy ALL extracted fields from X-Macros to main record
-            for (const auto& field : dynamic_record.fields) {
-                record.fields[field.first] = field.second;
-            }
-            
-            // Store in record structure for compatibility
-            // Note: test_num, head_num, site_num now handled by .def files
-            
-            // Optional: Extract text fields
-            if (ftr->VECT_NAM) {
-                record.fields["vect_nam"] = std::string(ftr->VECT_NAM + 1);  // Skip length byte
-            }
-            if (ftr->TIME_SET) {
-                record.fields["time_set"] = std::string(ftr->TIME_SET + 1);  // Skip length byte
-            }
-            if (ftr->OP_CODE) {
-                record.fields["op_code"] = std::string(ftr->OP_CODE + 1);  // Skip length byte
-            }
-            // Note: TEST_TXT and ALARM_ID now handled by .def files
-            if (ftr->PROG_TXT) {
-                record.fields["prog_txt"] = std::string(ftr->PROG_TXT + 1);  // Skip length byte
-            }
-            if (ftr->RSLT_TXT) {
-                record.fields["rslt_txt"] = std::string(ftr->RSLT_TXT + 1);  // Skip length byte
-            }
-            
-            record.fields["patg_num"] = std::to_string(ftr->PATG_NUM);
-            
-            // SPIN_MAP is a bit array - for now just indicate if present
-            if (ftr->SPIN_MAP) {
-                record.fields["spin_map"] = "present";
-            }
-        }
-    } catch (...) {
-        // If casting fails, continue with basic approach
-    }
-    
-    return record;
-}
-
-STDFRecord STDFParser::parse_hbr_record(void* hbr_rec) {
-    STDFRecord record;
-    record.type = STDFRecordType::HBR;
-    
-    rec_unknown* rec = static_cast<rec_unknown*>(hbr_rec);
-    
-    // Store header info safely
-    record.rec_type = rec->header.REC_TYP;
-    record.rec_subtype = rec->header.REC_SUB;
-    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
-    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
-    record.fields["RECORD_TYPE"] = "HBR";
-    
-    // PROPER LIBSTDF APPROACH: Direct casting (as shown in libstdf examples)
-    try {
-        // Check if it's actually a HBR record using libstdf macros
-        if (HEAD_TO_REC(rec->header) == REC_HBR) {
-            // Official libstdf approach: cast rec_unknown* to rec_hbr*
-            rec_hbr* hbr = (rec_hbr*)rec;
-            
-            // Extract ALL HBR fields using global shared extractor
-            DynamicSTDFRecord dynamic_record;
-            g_field_extractor.extract_fields(hbr, dynamic_record);
-            
-            // Copy ALL extracted fields from X-Macros to main record
-            for (const auto& field : dynamic_record.fields) {
-                record.fields[field.first] = field.second;
-            }
-            
-            // Store in record structure for compatibility
-            // Note: head_num, site_num now handled by .def files
-            
-            // Note: HBIN_NAM handled by .def files
-        }
-    } catch (...) {
-        // If casting fails, continue with basic approach
-    }
-    
-    return record;
-}
-
-STDFRecord STDFParser::parse_sbr_record(void* sbr_rec) {
-    STDFRecord record;
-    record.type = STDFRecordType::SBR;
-    
-    rec_unknown* rec = static_cast<rec_unknown*>(sbr_rec);
-    
-    // Store header info safely
-    record.rec_type = rec->header.REC_TYP;
-    record.rec_subtype = rec->header.REC_SUB;
-    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
-    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
-    record.fields["RECORD_TYPE"] = "SBR";
-    
-    // PROPER LIBSTDF APPROACH: Direct casting (as shown in libstdf examples)
-    try {
-        // Check if it's actually a SBR record using libstdf macros
-        if (HEAD_TO_REC(rec->header) == REC_SBR) {
-            // Official libstdf approach: cast rec_unknown* to rec_sbr*
-            rec_sbr* sbr = (rec_sbr*)rec;
-            
-            // Extract ALL SBR fields using global shared extractor
-            DynamicSTDFRecord dynamic_record;
-            g_field_extractor.extract_fields(sbr, dynamic_record);
-            
-            // Copy ALL extracted fields from X-Macros to main record
-            for (const auto& field : dynamic_record.fields) {
-                record.fields[field.first] = field.second;
-            }
-            
-            // Store in record structure for compatibility
-            // Note: head_num, site_num now handled by .def files
-            
-            // Note: SBIN_NAM handled by .def files
-        }
-    } catch (...) {
-        // If casting fails, continue with basic approach
-    }
-    
-    return record;
-}
-
-STDFRecord STDFParser::parse_mir_record(void* mir_rec) {
-    STDFRecord record;
-    record.type = STDFRecordType::MIR;
-    
-    rec_unknown* rec = static_cast<rec_unknown*>(mir_rec);
-    
-    // Store header info safely
-    record.rec_type = rec->header.REC_TYP;
-    record.rec_subtype = rec->header.REC_SUB;
-    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
-    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
-    record.fields["RECORD_TYPE"] = "MIR";
-    
-    // PROPER LIBSTDF APPROACH: Direct casting (consistent with other records)
-    try {
-        // Check if it's actually a MIR record using libstdf macros
-        if (HEAD_TO_REC(rec->header) == REC_MIR) {
-            // Official libstdf approach: cast rec_unknown* to rec_mir*
-            rec_mir* mir = (rec_mir*)rec;
-            
-            // Extract ALL MIR fields using global shared extractor
-            DynamicSTDFRecord dynamic_record;
-            g_field_extractor.extract_fields(mir, dynamic_record);
-            
-            // Copy ALL extracted fields from X-Macros to main record
-            for (const auto& field : dynamic_record.fields) {
-                record.fields[field.first] = field.second;
-            }
-            
-        } else {
-            std::cerr << "Warning: Record header mismatch in parse_mir_record" << std::endl;
-        }
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Exception in parse_mir_record: " << e.what() << std::endl;
-        record.fields["ERROR"] = e.what();
-    }
-    
-    return record;
-}
-
-STDFRecord STDFParser::parse_prr_record(void* prr_rec) {
-    STDFRecord record;
-    record.type = STDFRecordType::PRR;
-    
-    rec_unknown* rec = static_cast<rec_unknown*>(prr_rec);
-    
-    // Store header info safely
-    record.rec_type = rec->header.REC_TYP;
-    record.rec_subtype = rec->header.REC_SUB;
-    record.fields["REC_TYPE"] = std::to_string(record.rec_type);
-    record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
-    record.fields["RECORD_TYPE"] = "PRR";
-    
-    // PROPER LIBSTDF APPROACH: Direct casting (as shown in libstdf examples)
-    try {
-        // Check if it's actually a PRR record using libstdf macros
-        if (HEAD_TO_REC(rec->header) == REC_PRR) {
-            // Official libstdf approach: cast rec_unknown* to rec_prr*
-            rec_prr* prr = (rec_prr*)rec;
-            
-            // Extract ALL PRR fields using global shared extractor
-            DynamicSTDFRecord dynamic_record;
-            g_field_extractor.extract_fields(prr, dynamic_record);
-            
-            // Copy ALL extracted fields from X-Macros to main record
-            for (const auto& field : dynamic_record.fields) {
-                record.fields[field.first] = field.second;
-            }
-            
-            // Store in record structure for compatibility
-            // Note: head_num, site_num now handled by .def files
-            
-            // Optional: Extract text fields
-            if (prr->PART_ID) {
-                record.fields["PART_ID"] = std::string(prr->PART_ID + 1);  // Skip length byte
-            }
-            if (prr->PART_TXT) {
-                record.fields["PART_TXT"] = std::string(prr->PART_TXT + 1);  // Skip length byte
-            }
-            
-            // Extract binary field
-            if (prr->PART_FIX) {
-                // PART_FIX is a binary field - for now just indicate if present
-                record.fields["part_fix"] = "present";
-            }
-        }
-    } catch (...) {
-        // If casting fails, continue with basic approach
-    }
-    
-    return record;
-}
-
-// Safer record parsing with null checks and error handling
-STDFRecord STDFParser::parse_record_safe(void* raw_record, STDFRecordType type) {
-    STDFRecord record;
-    record.type = type;
-    
-    if (!raw_record) {
-        std::cerr << "Warning: NULL record pointer" << std::endl;
-        return record;
-    }
-    
-    try {
-        rec_unknown* rec = static_cast<rec_unknown*>(raw_record);
-        record.rec_type = rec->header.REC_TYP;
-        record.rec_subtype = rec->header.REC_SUB;
-        
-        // Only parse MIR record for now to avoid casting issues
-        if (type == STDFRecordType::MIR) {
-            return parse_mir_record(raw_record);
-        } else {
-            // For other records, just store basic header info
-            record.fields["REC_TYPE"] = std::to_string(record.rec_type);
-            record.fields["REC_SUB"] = std::to_string(record.rec_subtype);
-        }
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Exception in parse_record_safe: " << e.what() << std::endl;
-        record.fields["ERROR"] = e.what();
-    }
-    
-    return record;
-}

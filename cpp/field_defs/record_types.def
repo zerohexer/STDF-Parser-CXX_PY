@@ -1,0 +1,28 @@
+// ============================================================================
+// STDF Record Type Registry - Single Source of Truth
+// ============================================================================
+// Format: RECORD_TYPE(EnumName, libstdf_struct, rec_typ, rec_sub, LIBSTDF_MACRO)
+//
+// To add a new record type (e.g., TSR):
+//   1. Add one line here: RECORD_TYPE(TSR, rec_tsr, 10, 30, REC_TSR)
+//   2. Create field definition: cpp/field_defs/tsr_fields.def
+//   3. Add template specialization to dynamic_field_extractor.h/.cpp
+//   4. Rebuild with: python3 setup.py build_ext --inplace
+//
+// That's it! Enum, detector, and parser auto-generate from this registry.
+// ============================================================================
+
+RECORD_TYPE(MIR, rec_mir, 1,  10, REC_MIR)  // Master Information Record
+RECORD_TYPE(PTR, rec_ptr, 15, 10, REC_PTR)  // Parametric Test Record
+RECORD_TYPE(MPR, rec_mpr, 15, 15, REC_MPR)  // Multiple-Result Parametric Record
+RECORD_TYPE(FTR, rec_ftr, 15, 20, REC_FTR)  // Functional Test Record
+RECORD_TYPE(HBR, rec_hbr, 1,  40, REC_HBR)  // Hardware Bin Record
+RECORD_TYPE(SBR, rec_sbr, 1,  50, REC_SBR)  // Software Bin Record
+RECORD_TYPE(PRR, rec_prr, 5,  20, REC_PRR)  // Part Result Record
+
+// ============================================================================
+// Add new record types below (just copy the pattern above):
+// ============================================================================
+// RECORD_TYPE(TSR, rec_tsr, 10, 30, REC_TSR)  // Test Synopsis Record
+// RECORD_TYPE(WIR, rec_wir, 2,  10, REC_WIR)  // Wafer Information Record
+// RECORD_TYPE(WRR, rec_wrr, 2,  20, REC_WRR)  // Wafer Results Record

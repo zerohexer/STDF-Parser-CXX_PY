@@ -7,16 +7,16 @@
 #include <memory>
 #include <cstdint>
 
-// STDF Record Types we care about
+// ============================================================================
+// STDF Record Type Enum - Auto-generated from field_defs/record_types.def
+// ============================================================================
 enum class STDFRecordType {
-    PTR,  // Parametric Test Record
-    MPR,  // Multiple-Result Parametric Record  
-    FTR,  // Functional Test Record
-    HBR,  // Hardware Bin Record
-    SBR,  // Software Bin Record
-    PRR,  // Part Result Record
-    MIR,  // Master Information Record
-    UNKNOWN
+    UNKNOWN,
+
+    // X-Macro auto-generates enum values from registry
+    #define RECORD_TYPE(name, struct_type, typ, sub, macro) name,
+    #include "../field_defs/record_types.def"
+    #undef RECORD_TYPE
 };
 
 // Parsed STDF record structure
@@ -61,27 +61,32 @@ public:
     size_t get_parsed_records() const { return parsed_records_; }
     
 private:
-    // libstdf integration
+    // ========================================================================
+    // HYBRID APPROACH: Generic Template Parser
+    // ========================================================================
+    // ONE template handles ALL record types - no more per-type functions!
+    template<typename RecordStruct, int LibstdfMacro>
+    STDFRecord parse_generic_record(void* raw_record, STDFRecordType type, const char* type_name);
+
+    // Main dispatcher - uses X-Macros to auto-generate switch cases
+    STDFRecord parse_record(void* stdf_record, STDFRecordType type);
+
+    // ========================================================================
+    // Auto-generated from field_defs/record_types.def
+    // ========================================================================
+    STDFRecordType get_record_type(uint8_t rec_typ, uint8_t rec_sub);
+
+    // ========================================================================
+    // File handling
+    // ========================================================================
     bool open_stdf_file(const std::string& filepath);
     void close_stdf_file();
-    STDFRecord parse_record(void* stdf_record, STDFRecordType type);
-    STDFRecord parse_record_safe(void* stdf_record, STDFRecordType type);
-    
+
+    // Utility functions
+    std::string extract_string_field(const char* field, size_t max_len = 255);
+
     // Temporary sample data for testing (remove when libstdf is integrated)
     void create_sample_records(std::vector<STDFRecord>& results);
-    
-    // Record-specific parsers
-    STDFRecord parse_ptr_record(void* ptr_rec);
-    STDFRecord parse_mpr_record(void* mpr_rec);
-    STDFRecord parse_ftr_record(void* ftr_rec);
-    STDFRecord parse_hbr_record(void* hbr_rec);
-    STDFRecord parse_sbr_record(void* sbr_rec);
-    STDFRecord parse_mir_record(void* mir_rec);
-    STDFRecord parse_prr_record(void* prr_rec);
-    
-    // Utility functions
-    STDFRecordType get_record_type(uint8_t rec_typ, uint8_t rec_sub);
-    std::string extract_string_field(const char* field, size_t max_len = 255);
     
     // Configuration and state
     std::vector<STDFRecordType> enabled_types_;
