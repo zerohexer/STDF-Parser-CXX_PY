@@ -270,6 +270,7 @@ def main():
     parser = argparse.ArgumentParser(description="TRUE Parallel STDF Processing")
     parser.add_argument("--directory", required=True, help="Directory with STDF files")
     parser.add_argument("--workers", type=int, default=3, help="Number of parallel workers (default: 3)")
+    parser.add_argument("--push-batch-size", type=int, default=8, help="Push to ClickHouse after N files processed (default: 8)")
     parser.add_argument("--push-clickhouse", action="store_true", help="Push to ClickHouse")
     parser.add_argument("--ch-host", default="localhost", help="ClickHouse host")
     parser.add_argument("--ch-port", type=int, default=9000, help="ClickHouse port")
@@ -283,6 +284,7 @@ def main():
     print("=" * 70)
     print(f"Directory: {args.directory}")
     print(f"Workers: {args.workers}")
+    print(f"Push Batch Size: {args.push_batch_size} files")
     print(f"ClickHouse: {'✅ Enabled' if args.push_clickhouse else '❌ Disabled'}")
     if args.push_clickhouse:
         print(f"ClickHouse: {args.ch_host}:{args.ch_port}/{args.ch_database}")
@@ -330,8 +332,10 @@ def main():
             print(f"❌ ClickHouse setup failed: {e}")
             return 1
 
-    # TRUE PARALLEL PROCESSING
+    # TRUE PARALLEL PROCESSING WITH BATCHED PUSHING
     print(f"\n🚀 Starting TRUE PARALLEL processing with {args.workers} workers...")
+    print(f"📦 Will push to ClickHouse every {args.push_batch_size} files processed")
+    print(f"⚠️  IMPORTANT: Workers will WAIT after each batch until push completes")
     parallel_start = time.time()
 
     all_measurements = []
@@ -339,63 +343,111 @@ def main():
     all_new_params = []
     processed_files = 0
     skipped_files = 0
+    total_pushed_measurements = 0
+    batch_number = 0
 
-    # Prepare worker arguments
-    worker_args = [
-        (str(file), device_mappings, param_mappings, ch_config)
-        for file in stdf_files
-    ]
+    # Process files in batches
+    total_files = len(stdf_files)
+    file_index = 0
 
-    # ProcessPoolExecutor for TRUE parallelism
-    with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        # Submit all files
-        future_to_file = {
-            executor.submit(process_single_file_with_mappings, arg): arg[0]
-            for arg in worker_args
-        }
+    while file_index < total_files:
+        # Determine batch size (process up to push_batch_size files)
+        batch_end = min(file_index + args.push_batch_size, total_files)
+        current_batch_files = stdf_files[file_index:batch_end]
 
-        # Collect results as they complete
-        for future in as_completed(future_to_file):
-            file_path = future_to_file[future]
-            try:
-                result = future.result()
+        print(f"\n🔄 Processing batch of {len(current_batch_files)} files ({file_index + 1} to {batch_end} of {total_files})...")
 
-                if result.get('skipped'):
-                    skipped_files += 1
-                    continue
+        # Prepare worker arguments for this batch
+        worker_args = [
+            (str(file), device_mappings, param_mappings, ch_config)
+            for file in current_batch_files
+        ]
 
-                # Collect measurements
-                if result['measurements']:
-                    all_measurements.extend(result['measurements'])
+        # ProcessPoolExecutor for TRUE parallelism - ONLY for current batch
+        with ProcessPoolExecutor(max_workers=args.workers) as executor:
+            # Submit current batch files
+            future_to_file = {
+                executor.submit(process_single_file_with_mappings, arg): arg[0]
+                for arg in worker_args
+            }
 
-                # Collect new mappings
-                all_new_devices.extend(result['new_device_mappings'])
-                all_new_params.extend(result['new_param_mappings'])
+            # Collect results as they complete
+            for future in as_completed(future_to_file):
+                file_path = future_to_file[future]
+                try:
+                    result = future.result()
 
-                processed_files += 1
+                    if result.get('skipped'):
+                        skipped_files += 1
+                        continue
 
-            except Exception as e:
-                print(f"❌ Worker error for {os.path.basename(file_path)}: {e}")
+                    # Collect measurements
+                    if result['measurements']:
+                        all_measurements.extend(result['measurements'])
+
+                    # Collect new mappings
+                    all_new_devices.extend(result['new_device_mappings'])
+                    all_new_params.extend(result['new_param_mappings'])
+
+                    processed_files += 1
+
+                except Exception as e:
+                    print(f"❌ Worker error for {os.path.basename(file_path)}: {e}")
+
+        # Batch complete - now push to ClickHouse BEFORE processing next batch
+        if all_measurements or all_new_devices or all_new_params:
+            batch_number += 1
+            print(f"\n📦 BATCH {batch_number} COMPLETE: Processed {len(current_batch_files)} files")
+            print(f"🔒 WAITING: Pushing {len(all_measurements):,} measurements to ClickHouse...")
+
+            # Insert new mappings first
+            if args.push_clickhouse and client and (all_new_devices or all_new_params):
+                insert_new_mappings(client, all_new_devices, all_new_params)
+
+                # Extend with unique entries only (deduplicate before extending)
+                unique_new_devices = {}
+                for device_dmc, device_id in all_new_devices:
+                    if device_dmc not in unique_new_devices:
+                        unique_new_devices[device_dmc] = device_id
+
+                unique_new_params = {}
+                for param_name, param_id in all_new_params:
+                    if param_name not in unique_new_params:
+                        unique_new_params[param_name] = param_id
+
+                # Extend existing mappings with unique new entries
+                for device_dmc, device_id in unique_new_devices.items():
+                    device_mappings.append((device_dmc, device_id))
+
+                for param_name, param_id in unique_new_params.items():
+                    param_mappings.append((param_name, param_id))
+
+                print(f"✅ Extended mappings: +{len(unique_new_devices)} devices, +{len(unique_new_params)} params")
+                print(f"📊 Total mappings now: {len(device_mappings)} devices, {len(param_mappings)} params")
+
+                all_new_devices = []
+                all_new_params = []
+
+            # Push measurements batch
+            if args.push_clickhouse and client and all_measurements:
+                mega_push_measurements(client, all_measurements)
+                total_pushed_measurements += len(all_measurements)
+                all_measurements = []  # Clear batch
+
+            print(f"✅ Batch {batch_number} pushed successfully ({total_pushed_measurements:,} total)")
+            print(f"➡️  Ready to process next batch...\n")
+
+        # Move to next batch
+        file_index = batch_end
 
     parallel_time = time.time() - parallel_start
 
-    print(f"\n✅ PARALLEL PROCESSING COMPLETE:")
+    print(f"\n✅ ALL BATCHES COMPLETE:")
     print(f"   Files processed: {processed_files}")
     print(f"   Files skipped: {skipped_files}")
-    print(f"   Total measurements: {len(all_measurements):,}")
-    print(f"   New devices found: {len(set(d[0] for d in all_new_devices))}")
-    print(f"   New params found: {len(set(p[0] for p in all_new_params))}")
+    print(f"   Total batches: {batch_number}")
+    print(f"   Total measurements pushed: {total_pushed_measurements:,}")
     print(f"   Parallel time: {parallel_time:.2f}s")
-    print(f"   Throughput: {len(all_measurements) / parallel_time:,.0f} measurements/second")
-
-    # Insert new mappings to database
-    if args.push_clickhouse and client and (all_new_devices or all_new_params):
-        print(f"\n💾 Inserting new mappings to database...")
-        insert_new_mappings(client, all_new_devices, all_new_params)
-
-    # Mega-push measurements
-    if args.push_clickhouse and client and all_measurements:
-        mega_push_measurements(client, all_measurements)
 
     total_time = time.time() - total_start
 
@@ -404,9 +456,10 @@ def main():
     print(f"Total files: {len(stdf_files)}")
     print(f"Processed: {processed_files}")
     print(f"Skipped: {skipped_files}")
-    print(f"Total measurements: {len(all_measurements):,}")
+    print(f"Total measurements pushed: {total_pushed_measurements:,}")
     print(f"Total time: {total_time:.2f}s")
-    print(f"Overall throughput: {len(all_measurements) / total_time:,.0f} measurements/second")
+    if total_pushed_measurements > 0:
+        print(f"Overall throughput: {total_pushed_measurements / total_time:,.0f} measurements/second")
     print(f"Platform: {platform.system()} ({platform.machine()})")
 
     return 0
