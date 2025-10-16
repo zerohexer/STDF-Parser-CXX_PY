@@ -4,6 +4,7 @@ from setuptools import setup, Extension
 import os
 import sys
 import sysconfig
+import glob
 
 # Define the extension module
 stdf_parser_extension = Extension(
@@ -22,14 +23,7 @@ stdf_parser_extension = Extension(
     ],
     depends=[
         # X-Macros field definition files - setuptools will track changes
-        'cpp/field_defs/ptr_fields.def',
-        'cpp/field_defs/mpr_fields.def',
-        'cpp/field_defs/ftr_fields.def',
-        'cpp/field_defs/hbr_fields.def',
-        'cpp/field_defs/sbr_fields.def',
-        'cpp/field_defs/prr_fields.def',
-        'cpp/field_defs/mir_fields.def',
-        'cpp/field_defs/measurement_fields.def',
+        *glob.glob('cpp/field_defs/*'),
         # Header files
         'cpp/include/stdf_parser.h',
         'cpp/include/dynamic_field_extractor.h',
