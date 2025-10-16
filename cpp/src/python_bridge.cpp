@@ -189,7 +189,7 @@ static PyObject* precompute_measurement_fields(PyObject* self, PyObject* args) {
     return computed_fields;
 }
 
-// 🚀 ULTRA-FAST: Process STDF to ClickHouse tuples entirely in C++
+// Process STDF to ClickHouse tuples entirely in C++
 static PyObject* process_stdf_to_clickhouse_tuples(PyObject* self, PyObject* args) {
     const char* filepath;
     
@@ -216,7 +216,7 @@ static PyObject* process_stdf_to_clickhouse_tuples(PyObject* self, PyObject* arg
             return PyUnicode_FromString(str.c_str());
         };
         
-        // 🚀 MACRO-DRIVEN: Calculate tuple size automatically
+        // MACRO-DRIVEN: Calculate tuple size automatically
         constexpr size_t TUPLE_SIZE = 0
         #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) + 1
         #include "../field_defs/measurement_fields.def"
@@ -233,7 +233,7 @@ static PyObject* process_stdf_to_clickhouse_tuples(PyObject* self, PyObject* arg
                 return nullptr;
             }
             
-            // 🚀 MACRO-DRIVEN: Pack measurement data using macro expansion
+            // MACRO-DRIVEN: Pack measurement data using macro expansion
             size_t field_index = 0;
             #define MEASUREMENT_FIELD(name, cpp_type, python_conversion, clickhouse_type) \
                 PyTuple_SetItem(tuple, field_index++, python_conversion(m.name));
@@ -294,7 +294,7 @@ static PyObject* process_stdf_to_clickhouse_tuples(PyObject* self, PyObject* arg
     }
 }
 
-// 🔧 DATABASE-AWARE: Process STDF with existing database mappings
+// Process STDF with existing database mappings
 static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* args, PyObject* kwargs) {
     const char* filepath;
     PyObject* device_mappings_list;
@@ -315,7 +315,7 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
         // Set the file hash from Python (MD5) to ensure consistency
         if (file_hash && strlen(file_hash) > 0) {
             processor.set_file_hash(std::string(file_hash));
-            std::cout << "🔑 Using Python-generated MD5 hash: " << file_hash << std::endl;
+            std::cout << "Using Python-generated MD5 hash: " << file_hash << std::endl;
         }
         
         // Convert Python lists to C++ vectors
@@ -358,14 +358,14 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
             }
         }
         
-        std::cout << "🔧 Loading " << device_mappings.size() << " device mappings, "
+        std::cout << "Loading " << device_mappings.size() << " device mappings, "
                   << param_mappings.size() << " parameter mappings from database" << std::endl;
 
         // Load existing mappings into processor
         auto& id_manager = const_cast<FastIDManager&>(processor.get_id_manager());
         id_manager.load_existing_mappings_from_python(device_mappings, param_mappings);
 
-        // 🚀 RUNTIME FLEXIBLE: Parse extra_fields from Python
+        // Parse extra_fields from Python
         std::vector<std::pair<std::string, std::vector<std::string>>> extra_fields;
 
         if (extra_fields_list && PyList_Check(extra_fields_list)) {
@@ -396,7 +396,7 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
         // Set extra fields specification
         if (!extra_fields.empty()) {
             processor.set_extra_fields(extra_fields);
-            std::cout << "🚀 RUNTIME FLEXIBLE: Processing with " << extra_fields.size()
+            std::cout << "Processing with " << extra_fields.size()
                       << " extra field groups" << std::endl;
         }
 
@@ -420,7 +420,7 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
         for (size_t i = 0; i < measurements.size(); ++i) {
             const auto& m = measurements[i];
 
-            // 🚀 RUNTIME FLEXIBLE: Tuple size = base fields + 1 (for extra_fields dict)
+            // Tuple size = base fields + 1 (for extra_fields dict)
             PyObject* tuple = PyTuple_New(TUPLE_SIZE + 1);
             if (!tuple) {
                 Py_DECREF(tuple_list);
@@ -435,7 +435,7 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
             #include "../field_defs/measurement_fields.def"
             #undef MEASUREMENT_FIELD
 
-            // 🚀 RUNTIME FLEXIBLE: Add extra_fields as Python dict (14th element)
+            // Add extra_fields as Python dict (14th element)
             PyObject* extra_dict = PyDict_New();
             for (const auto& [key, value] : m.extra_fields) {
                 PyDict_SetItemString(extra_dict, key.c_str(), PyUnicode_FromString(value.c_str()));
@@ -449,7 +449,7 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
         auto new_device_mappings = id_manager.get_new_device_mappings();
         auto new_param_mappings = id_manager.get_new_param_mappings();
         
-        std::cout << "🆕 Found " << new_device_mappings.size() << " new devices, " 
+        std::cout << "Found " << new_device_mappings.size() << " new devices, "
                   << new_param_mappings.size() << " new parameters to insert" << std::endl;
         
         // Create result dictionary
@@ -498,7 +498,7 @@ static PyObject* process_stdf_with_database_mappings(PyObject* self, PyObject* a
 
 static PyObject* process_stdf_file_measurements(PyObject* self, PyObject* args, PyObject* kwargs) {
     /**
-     * 🚀 RUNTIME FLEXIBLE: Process STDF file with optional extra fields
+     * Process STDF file with optional extra fields
      * Python specifies which fields to add at runtime - NO C++ rebuild needed!
      *
      * Args:
@@ -520,7 +520,7 @@ static PyObject* process_stdf_file_measurements(PyObject* self, PyObject* args, 
         // Create ultra-fast processor
         UltraFastProcessor processor;
 
-        // 🚀 RUNTIME FLEXIBLE: Parse extra_fields from Python
+        // Parse extra_fields from Python
         std::vector<std::pair<std::string, std::vector<std::string>>> extra_fields;
 
         if (extra_fields_list && PyList_Check(extra_fields_list)) {
@@ -551,11 +551,10 @@ static PyObject* process_stdf_file_measurements(PyObject* self, PyObject* args, 
         // Set extra fields specification
         if (!extra_fields.empty()) {
             processor.set_extra_fields(extra_fields);
-            std::cout << "🚀 RUNTIME FLEXIBLE: Processing with " << extra_fields.size()
+            std::cout << "Processing with " << extra_fields.size()
                       << " extra field groups" << std::endl;
         } else {
-            std::cout << "🚀 PURE SPEED: Processing STDF file for measurements only" << std::endl;
-            std::cout << "   No file hash calculation, no segment tracking = maximum speed!" << std::endl;
+            std::cout << "Processing STDF file for measurements only" << std::endl;
         }
 
         // Process STDF file with pure measurement extraction
@@ -578,7 +577,7 @@ static PyObject* process_stdf_file_measurements(PyObject* self, PyObject* args, 
         for (size_t i = 0; i < measurements.size(); ++i) {
             const auto& m = measurements[i];
 
-            // 🚀 RUNTIME FLEXIBLE: Tuple size = base fields + 1 (for extra_fields dict)
+            // Tuple size = base fields + 1 (for extra_fields dict)
             PyObject* tuple = PyTuple_New(TUPLE_SIZE + 1);
             if (!tuple) {
                 Py_DECREF(tuple_list);
@@ -593,7 +592,7 @@ static PyObject* process_stdf_file_measurements(PyObject* self, PyObject* args, 
             #include "../field_defs/measurement_fields.def"
             #undef MEASUREMENT_FIELD
 
-            // 🚀 RUNTIME FLEXIBLE: Add extra_fields as Python dict (14th element)
+            // Add extra_fields as Python dict (14th element)
             PyObject* extra_dict = PyDict_New();
             for (const auto& [key, value] : m.extra_fields) {
                 PyDict_SetItemString(extra_dict, key.c_str(), PyUnicode_FromString(value.c_str()));
@@ -639,10 +638,10 @@ static PyObject* process_stdf_file_measurements(PyObject* self, PyObject* args, 
             PyList_SetItem(param_mappings_list, param_idx++, param_tuple);
         }
 
-        std::cout << "🚀 PURE SPEED completed!" << std::endl;
-        std::cout << "   📊 Measurements: " << measurements.size() << std::endl;
-        std::cout << "   📊 Devices: " << device_map.size() << std::endl;
-        std::cout << "   📊 Parameters: " << param_map.size() << std::endl;
+        std::cout << "Measurement Computation Done" << std::endl;
+        std::cout << "Measurements: " << measurements.size() << std::endl;
+        std::cout << "Devices: " << device_map.size() << std::endl;
+        std::cout << "Parameters: " << param_map.size() << std::endl;
 
         // Create result dictionary
         PyObject* result_dict = PyDict_New();
@@ -682,11 +681,11 @@ static PyMethodDef StdfParserMethods[] = {
     {"precompute_measurement_fields", precompute_measurement_fields, METH_VARARGS,
      "Pre-compute expensive measurement fields in C++"},
     {"process_stdf_to_clickhouse_tuples", process_stdf_to_clickhouse_tuples, METH_VARARGS,
-     "🚀 ULTRA-FAST: Process STDF to ClickHouse tuples entirely in C++"},
+     "Process STDF to ClickHouse tuples entirely in C++"},
     {"process_stdf_with_database_mappings", (PyCFunction)process_stdf_with_database_mappings, METH_VARARGS | METH_KEYWORDS,
-     "🔧 DATABASE-AWARE: Process STDF with existing database mappings, optional file hash, and optional extra_fields"},
+     "Process STDF with existing database mappings, optional file hash, and optional extra_fields"},
     {"process_stdf_file_measurements", (PyCFunction)process_stdf_file_measurements, METH_VARARGS | METH_KEYWORDS,
-     "🚀 RUNTIME FLEXIBLE: Process STDF file with optional extra_fields (no C++ rebuild!)"},
+     "Process STDF file with optional extra_fields (no C++ rebuild!)"},
     {"get_version", get_version, METH_NOARGS,
      "Get version information"},
     {nullptr, nullptr, 0, nullptr}

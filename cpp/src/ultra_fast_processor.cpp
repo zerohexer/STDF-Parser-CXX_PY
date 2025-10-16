@@ -34,9 +34,9 @@ void FastIDManager::load_existing_mappings_from_python(
     }
     param_counter_ = max_param_id + 1;
     
-    std::cout << "🔧 Loaded " << device_mappings.size() << " existing device mappings, " 
+    std::cout << "Loaded " << device_mappings.size() << " existing device mappings, "
               << param_mappings.size() << " parameter mappings" << std::endl;
-    std::cout << "🔢 Starting counters: devices=" << device_counter_ 
+    std::cout << "Starting counters: devices=" << device_counter_
               << ", parameters=" << param_counter_ << std::endl;
 }
 
@@ -83,7 +83,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file(const std::s
     auto start_time = std::chrono::high_resolution_clock::now();
     
     try {
-        std::cout << "🚀 Ultra-fast C++ processing: " << filepath << std::endl;
+        std::cout << "Ultra-fast C++ processing: " << filepath << std::endl;
         
         // Step 1: Parse STDF file using existing parser
         auto parse_start = std::chrono::high_resolution_clock::now();
@@ -95,7 +95,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file(const std::s
         parsing_time_ = std::chrono::duration<double>(parse_end - parse_start).count();
         total_records_ = records.size();
         
-        std::cout << "⚡ C++ parsed " << total_records_ << " records in " 
+        std::cout << "C++ parsed " << total_records_ << " records in "
                   << parsing_time_ << "s" << std::endl;
         
         // Step 2: Process records entirely in C++
@@ -106,8 +106,8 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file(const std::s
         auto prr_records = filter_records_by_type(records, STDFRecordType::PRR);
         auto test_records = filter_test_records(records);
         
-        std::cout << "📊 Found " << mir_records.size() << " MIR, " 
-                  << prr_records.size() << " PRR, " 
+        std::cout << "Found " << mir_records.size() << " MIR, "
+                  << prr_records.size() << " PRR, "
                   << test_records.size() << " test records" << std::endl;
         
         // Extract MIR information
@@ -127,21 +127,21 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file(const std::s
         
         auto total_time = std::chrono::duration<double>(process_end - start_time).count();
         
-        std::cout << "✅ Ultra-fast C++ processing completed:" << std::endl;
-        std::cout << "   📊 Total records: " << total_records_ << std::endl;
-        std::cout << "   📊 Measurements: " << processed_measurements_ << std::endl;
-        std::cout << "   ⏱️ Parsing time: " << parsing_time_ << "s" << std::endl;
-        std::cout << "   ⏱️ Processing time: " << processing_time_ << "s" << std::endl;
-        std::cout << "   ⏱️ Total time: " << total_time << "s" << std::endl;
-        
+        std::cout << "Processing Completed!" << std::endl;
+        std::cout << "   Total records: " << total_records_ << std::endl;
+        std::cout << "   Measurements: " << processed_measurements_ << std::endl;
+        std::cout << "   Parsing time: " << parsing_time_ << "s" << std::endl;
+        std::cout << "   Processing time: " << processing_time_ << "s" << std::endl;
+        std::cout << "   Total time: " << total_time << "s" << std::endl;
+
         if (total_time > 0) {
             double throughput = processed_measurements_ / total_time;
-            std::cout << "   🚀 Throughput: " << static_cast<uint64_t>(throughput) 
+            std::cout << "   Throughput: " << static_cast<uint64_t>(throughput)
                       << " measurements/second" << std::endl;
         }
         
     } catch (const std::exception& e) {
-        std::cerr << "❌ Error in ultra-fast processing: " << e.what() << std::endl;
+        std::cerr << "Error in ultra-fast processing: " << e.what() << std::endl;
     }
     
     return measurements;
@@ -153,7 +153,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file_measurements
     auto start_time = std::chrono::high_resolution_clock::now();
 
     try {
-        std::cout << "🚀 Ultra-fast C++ processing (NO HASH, NO SEGMENTS): " << filepath << std::endl;
+        std::cout << "Measurement Processing: " << filepath << std::endl;
 
         // Step 1: Parse STDF file using existing parser
         auto parse_start = std::chrono::high_resolution_clock::now();
@@ -165,7 +165,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file_measurements
         parsing_time_ = std::chrono::duration<double>(parse_end - parse_start).count();
         total_records_ = records.size();
 
-        std::cout << "⚡ C++ parsed " << total_records_ << " records in "
+        std::cout << "C++ parsed " << total_records_ << " records in "
                   << parsing_time_ << "s" << std::endl;
 
         // Step 2: Process records entirely in C++
@@ -176,17 +176,17 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file_measurements
         auto prr_records = filter_records_by_type(records, STDFRecordType::PRR);
         auto test_records = filter_test_records(records);
 
-        std::cout << "📊 Found " << mir_records.size() << " MIR, "
+        std::cout << "Found " << mir_records.size() << " MIR, "
                   << prr_records.size() << " PRR, "
                   << test_records.size() << " test records" << std::endl;
 
         // Extract MIR information
         MIRInfo mir_info = extract_mir_info(mir_records);
 
-        // 🔥 SKIP FILE HASH: No file hash calculation (was causing hanging!)
+        // SKIP FILE HASH: No file hash calculation (was causing hanging!)
         file_hash_ = "no_hash";
 
-        // 🚀 Process cross-product WITHOUT segments (much faster!)
+        // Process cross-product WITHOUT segments (much faster!)
         measurements = process_cross_product_measurements(prr_records, test_records, mir_info);
 
         auto process_end = std::chrono::high_resolution_clock::now();
@@ -195,20 +195,20 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_stdf_file_measurements
 
         auto total_time = std::chrono::duration<double>(process_end - start_time).count();
 
-        std::cout << "✅ Ultra-fast C++ processing completed:" << std::endl;
-        std::cout << "   📊 Total records: " << total_records_ << std::endl;
-        std::cout << "   📊 Measurements: " << processed_measurements_ << std::endl;
-        std::cout << "   ⏱️ Parsing time: " << parsing_time_ << "s" << std::endl;
-        std::cout << "   ⏱️ Processing time: " << processing_time_ << "s" << std::endl;
-        std::cout << "   ⏱️ Total time: " << total_time << "s" << std::endl;
+        std::cout << "Processing Completed!" << std::endl;
+        std::cout << "   Total records: " << total_records_ << std::endl;
+        std::cout << "   Measurements: " << processed_measurements_ << std::endl;
+        std::cout << "   Parsing time: " << parsing_time_ << "s" << std::endl;
+        std::cout << "   Processing time: " << processing_time_ << "s" << std::endl;
+        std::cout << "   Total time: " << total_time << "s" << std::endl;
 
         if (total_time > 0) {
             double throughput = processed_measurements_ / total_time;
-            std::cout << "   🚀 Throughput: " << static_cast<size_t>(throughput) << " measurements/seconds" << std::endl;
+            std::cout << "   Throughput: " << static_cast<size_t>(throughput) << " measurements/seconds" << std::endl;
         }
 
     } catch (const std::exception& e) {
-        std::cerr << "❌ Error processing STDF file: " << e.what() << std::endl;
+        std::cerr << "Error processing STDF file: " << e.what() << std::endl;
     }
 
     return measurements;
@@ -246,7 +246,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
     std::vector<MeasurementTuple> measurements;
     
     if (prr_records.empty() || test_records.empty()) {
-        std::cout << "⚠️ No PRR or test records found for cross-product" << std::endl;
+        std::cout << "No PRR or test records found for cross-product" << std::endl;
         return measurements;
     }
     
@@ -254,10 +254,10 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
     size_t estimated_size = prr_records.size() * test_records.size() * 3; // Estimate 3 values per test
     measurements.reserve(estimated_size);
     
-    std::cout << "🚀 C++ cross-product: " << prr_records.size() << " devices × "
+    std::cout << "C++ cross-product: " << prr_records.size() << " devices x "
               << test_records.size() << " tests = ~" << estimated_size << " estimated measurements" << std::endl;
 
-    // 🚀 RUNTIME FLEXIBLE: Build extra fields lookup if specified
+    // Build extra fields lookup if specified
     std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>> extra_fields_lookup;
     if (!extra_fields_spec_.empty()) {
         extra_fields_lookup = build_extra_fields_lookup(test_records);
@@ -333,13 +333,13 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
         processed_tests.push_back(std::move(pt));
     }
     
-    std::cout << "🎯 Pre-processed " << pixel_tests_found << " pixel tests from " 
+    std::cout << "Pre-processed " << pixel_tests_found << " pixel tests from "
               << test_records.size() << " total tests" << std::endl;
     
     // Process cross-product
     size_t measurements_created = 0;
     
-    // 🚀 SEGMENT TRACKING: Add duplicate tracking for segment calculation
+    // SEGMENT TRACKING: Add duplicate tracking for segment calculation
     std::unordered_map<std::string, uint32_t> duplicate_tracker;
     
     for (const auto& prr : prr_records) {
@@ -371,7 +371,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
             for (double value : test.values) {
                 MeasurementTuple measurement;
                 
-                // 🚀 MACRO-DRIVEN: Initialize measurement using X-Macro pattern from .def file
+                // Initialize measurement using X-Macro pattern from .def file
                 // Define initialization values for each field type
                 auto init_wld_id = device_id;
                 auto init_wtp_id = test.param_id;
@@ -380,7 +380,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
                 auto init_wptm_value = value;
                 auto init_test_flag = test_flag;
                 
-                // 🚀 SEGMENT CALCULATION: Create duplicate key INCLUDING VALUE and increment segment
+                // SEGMENT CALCULATION: Create duplicate key INCLUDING VALUE and increment segment
                 // Only increment segment for EXACT duplicates (same coordinates AND same value)
                 std::string duplicate_key = std::to_string(init_wld_id) + "_" + 
                                           std::to_string(init_wtp_id) + "_" + 
@@ -404,7 +404,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
                 #include "../field_defs/measurement_fields.def"
                 #undef MEASUREMENT_FIELD
 
-                // 🚀 RUNTIME FLEXIBLE: Add extra fields from lookup (C++ hash map - FAST!)
+                // Add extra fields from lookup (C++ hash map - FAST!)
                 if (!extra_fields_lookup.empty()) {
                     auto extra_it = extra_fields_lookup.find(test.test_num);
                     if (extra_it != extra_fields_lookup.end()) {
@@ -418,9 +418,9 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
         }
     }
 
-    std::cout << "✅ C++ cross-product completed: " << measurements_created
+    std::cout << "C++ cross-product completed: " << measurements_created
               << " measurements created" << std::endl;
-    std::cout << "🔢 Segment tracking: " << duplicate_tracker.size() 
+    std::cout << "Segment tracking: " << duplicate_tracker.size()
               << " unique coordinate combinations tracked" << std::endl;
     
     return measurements;
@@ -434,7 +434,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
     std::vector<MeasurementTuple> measurements;
 
     if (prr_records.empty() || test_records.empty()) {
-        std::cout << "⚠️ No PRR or test records found for cross-product" << std::endl;
+        std::cout << "No PRR or test records found for cross-product" << std::endl;
         return measurements;
     }
 
@@ -442,10 +442,10 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
     size_t estimated_size = prr_records.size() * test_records.size() * 3; // Estimate 3 values per test
     measurements.reserve(estimated_size);
 
-    std::cout << "🚀 C++ cross-product (NO SEGMENTS): " << prr_records.size() << " devices × "
+    std::cout << "C++ cross-product: " << prr_records.size() << " devices x "
               << test_records.size() << " tests = ~" << estimated_size << " estimated measurements" << std::endl;
 
-    // 🚀 RUNTIME FLEXIBLE: Build extra fields lookup if specified
+    // Build extra fields lookup if specified
     std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>> extra_fields_lookup;
     if (!extra_fields_spec_.empty()) {
         // Build lookup from ALL records (need access to all record types)
@@ -523,13 +523,13 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
         processed_tests.push_back(std::move(pt));
     }
 
-    std::cout << "🎯 Pre-processed " << pixel_tests_found << " pixel tests from "
+    std::cout << "Pre-processed " << pixel_tests_found << " pixel tests from "
               << test_records.size() << " total tests" << std::endl;
 
     // Process cross-product
     size_t measurements_created = 0;
 
-    // 🚀 NO SEGMENT TRACKING: Skip expensive string operations and duplicate tracking!
+    // NO SEGMENT TRACKING: Skip expensive string operations and duplicate tracking!
     for (const auto& prr : prr_records) {
         // Extract device information
         auto get_prr_field = [&](const std::string& key, const std::string& fallback = "") {
@@ -559,7 +559,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
             for (double value : test.values) {
                 MeasurementTuple measurement;
 
-                // 🚀 MACRO-DRIVEN: Initialize measurement using X-Macro pattern from .def file
+                // Initialize measurement using X-Macro pattern from .def file
                 auto init_wld_id = device_id;
                 auto init_wtp_id = test.param_id;
                 auto init_wp_pos_x = (test.pixel_x != 0) ? test.pixel_x : default_x;
@@ -567,7 +567,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
                 auto init_wptm_value = value;
                 auto init_test_flag = test_flag;
 
-                // 🚀 NO SEGMENT TRACKING: Always set segment to 0 (much faster!)
+                // NO SEGMENT TRACKING: Always set segment to 0 (much faster!)
                 auto init_segment = static_cast<uint8_t>(0);
                 auto init_file_hash = file_hash_;
                 auto init_wld_device_dmc = device_dmc;
@@ -583,7 +583,7 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
                 #include "../field_defs/measurement_fields.def"
                 #undef MEASUREMENT_FIELD
 
-                // 🚀 RUNTIME FLEXIBLE: Add extra fields from lookup (C++ hash map - FAST!)
+                // Add extra fields from lookup (C++ hash map - FAST!)
                 if (!extra_fields_lookup.empty()) {
                     auto extra_it = extra_fields_lookup.find(test.test_num);
                     if (extra_it != extra_fields_lookup.end()) {
@@ -597,9 +597,8 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
         }
     }
 
-    std::cout << "✅ C++ cross-product (NO SEGMENTS) completed: " << measurements_created
+    std::cout << "C++ cross-product completed: " << measurements_created
               << " measurements created" << std::endl;
-    std::cout << "🚀 SPEED BOOST: No segment tracking = much faster processing!" << std::endl;
 
     return measurements;
 }
@@ -820,7 +819,7 @@ uint8_t UltraFastProcessor::calculate_test_flag(const STDFRecord& prr_record) {
     }
 }
 
-// 🚀 RUNTIME FLEXIBLE: Convert string to STDFRecordType
+// Convert string to STDFRecordType
 STDFRecordType UltraFastProcessor::string_to_record_type(const std::string& type_str) {
     if (type_str == "PTR") return STDFRecordType::PTR;
     if (type_str == "MPR") return STDFRecordType::MPR;
@@ -832,7 +831,7 @@ STDFRecordType UltraFastProcessor::string_to_record_type(const std::string& type
     return STDFRecordType::UNKNOWN;
 }
 
-// 🚀 RUNTIME FLEXIBLE: Build lookup for extra fields from specification
+// Build lookup for extra fields from specification
 std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>>
 UltraFastProcessor::build_extra_fields_lookup(const std::vector<STDFRecord>& records) {
     std::unordered_map<uint32_t, std::unordered_map<std::string, std::string>> lookup;
@@ -841,14 +840,14 @@ UltraFastProcessor::build_extra_fields_lookup(const std::vector<STDFRecord>& rec
         return lookup;  // No extra fields requested
     }
 
-    std::cout << "🚀 Building extra fields lookup..." << std::endl;
+    std::cout << "Building extra fields lookup..." << std::endl;
 
     // For each extra field specification: ('FTR', ['VECT_NAM', 'TIME_SET', 'OP_CODE'])
     for (const auto& [record_type_str, field_names] : extra_fields_spec_) {
         STDFRecordType target_type = string_to_record_type(record_type_str);
 
         if (target_type == STDFRecordType::UNKNOWN) {
-            std::cerr << "⚠️  Unknown record type: " << record_type_str << std::endl;
+            std::cerr << "Unknown record type: " << record_type_str << std::endl;
             continue;
         }
 
@@ -874,12 +873,12 @@ UltraFastProcessor::build_extra_fields_lookup(const std::vector<STDFRecord>& rec
             }
         }
 
-        std::cout << "   ✅ " << record_type_str << ": Extracted "
+        std::cout << "   " << record_type_str << ": Extracted "
                   << field_names.size() << " fields from "
                   << matched_records << " records" << std::endl;
     }
 
-    std::cout << "   📋 Total lookup entries: " << lookup.size() << std::endl;
+    std::cout << "   Total lookup entries: " << lookup.size() << std::endl;
 
     return lookup;
 }
