@@ -75,33 +75,35 @@ def generate_file_hash(file_path):
         return ""
 
 
-def extract_mir_from_stdf_fast(file_path):
+def extract_mir_from_measurements(measurements):
     """
-    Extract MIR (Master Information Record) for device_info metadata
+    Extract MIR from first measurement's extra_fields (already parsed by C++)
+
+    Args:
+        measurements: List of measurement tuples
 
     Returns:
         dict with facility, operation, lot_name, equipment, prog_name, prog_version
     """
+    if not measurements:
+        return {}
+
     try:
-        result = stdf_parser_cpp.parse_stdf_file(file_path)
-        records = result.get('records', [])
+        # Get extra_fields from first measurement (field 13)
+        first_measurement = measurements[0]
+        extra_fields = first_measurement[13]  # 14th field (index 13)
 
-        for record in records:
-            if record.get('record_type') == 'MIR':
-                fields = record.get('fields', {})
-                return {
-                    'facility': fields.get('FACIL_ID', ''),
-                    'operation': fields.get('OPER_NAM', ''),
-                    'lot_name': fields.get('LOT_ID', ''),
-                    'equipment': fields.get('NODE_NAM', ''),
-                    'prog_name': fields.get('JOB_REV', ''),
-                    'prog_version': fields.get('SBLOT_ID', '')
-                }
-
-        return {}  # Empty if no MIR found
-
+        # Map MIR fields to device_info fields
+        return {
+            'facility': extra_fields.get('FACIL_ID', ''),
+            'operation': extra_fields.get('OPER_NAM', ''),
+            'lot_name': extra_fields.get('LOT_ID', ''),
+            'equipment': extra_fields.get('NODE_NAM', ''),
+            'prog_name': extra_fields.get('JOB_REV', ''),
+            'prog_version': extra_fields.get('SBLOT_ID', '')
+        }
     except Exception as e:
-        print(f"⚠️ MIR extraction error for {os.path.basename(file_path)}: {e}")
+        print(f"⚠️ MIR extraction error: {e}")
         return {}
 
 
@@ -151,13 +153,14 @@ def process_single_file_with_mappings(args):
             except Exception as e:
                 print(f"⚠️ Could not check for duplicates: {e}")
 
-        # 🚀 DATABASE-AWARE C++ PROCESSING
+        # 🚀 DATABASE-AWARE C++ PROCESSING (with MIR fields in extra_fields)
         # C++ will use existing mappings and return ONLY new mappings found
         result = stdf_parser_cpp.process_stdf_with_database_mappings(
             file_path,
             device_mappings,  # Existing mappings passed in
             param_mappings,   # Existing mappings passed in
-            file_hash         # Pass file hash for consistency
+            file_hash,        # Pass file hash for consistency
+            extra_fields=[('MIR', ['FACIL_ID', 'OPER_NAM', 'LOT_ID', 'NODE_NAM', 'JOB_REV', 'SBLOT_ID'])]
         )
 
         measurements = result['measurement_tuples']
@@ -166,8 +169,8 @@ def process_single_file_with_mappings(args):
 
         elapsed = time.time() - start_time
 
-        # Extract MIR info for device_info table
-        mir_info = extract_mir_from_stdf_fast(file_path)
+        # Extract MIR info from measurements (no duplicate parse!)
+        mir_info = extract_mir_from_measurements(measurements)
 
         print(f"✅ {os.path.basename(file_path)}: {len(measurements):,} measurements in {elapsed:.2f}s")
         print(f"   📊 New devices: {len(new_device_mappings)}, New params: {len(new_param_mappings)}")
