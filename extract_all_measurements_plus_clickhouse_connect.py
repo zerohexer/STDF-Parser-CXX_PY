@@ -49,6 +49,7 @@ class STDFProcessor:
         self.new_param_mappings = []
         self.processing_stats = {}
         self.current_file_hash = None
+        self.mir_info = {}
 
         print(f"🚀 STDFProcessor initialized (cleaned version)")
         print(f"   ClickHouse: {'✅ Enabled' if enable_clickhouse else '❌ Disabled'}")
@@ -77,6 +78,112 @@ class STDFProcessor:
         except Exception as e:
             print(f"⚠️  Error checking file hash: {e}")
             return False
+
+    def _extract_mir_from_measurements(self):
+        """Extract MIR from first measurement's extra_fields (already parsed by C++)"""
+        if not self.measurement_tuples:
+            return {}
+
+        # Get extra_fields from first measurement (field 13)
+        try:
+            first_measurement = self.measurement_tuples[0]
+            extra_fields = first_measurement[13]  # 14th field (index 13)
+
+            # Map MIR fields to device_info fields
+            return {
+                'facility': extra_fields.get('FACIL_ID', ''),
+                'operation': extra_fields.get('OPER_NAM', ''),
+                'lot_name': extra_fields.get('LOT_ID', ''),
+                'equipment': extra_fields.get('NODE_NAM', ''),
+                'prog_name': extra_fields.get('JOB_REV', ''),
+                'prog_version': extra_fields.get('SBLOT_ID', '')
+            }
+        except Exception as e:
+            print(f"⚠️  MIR extraction error: {e}")
+            return {}
+
+    def _collect_device_info(self):
+        """Build device_info records from measurements + MIR data"""
+        device_info_map = {}
+        current_time = datetime.now()
+
+        for tuple_data in self.measurement_tuples:
+            # Direct tuple indexing for speed
+            wld_id = tuple_data[0]
+
+            # Skip if already processed
+            if wld_id in device_info_map:
+                continue
+
+            test_flag = tuple_data[5]
+            wld_device_dmc = tuple_data[8]
+
+            # Determine bin code/desc from test_flag
+            bin_code = '1' if test_flag == 1 else '0'
+            bin_desc = 'PASS' if test_flag == 1 else 'FAIL'
+
+            device_info_map[wld_id] = {
+                'wld_id': wld_id,
+                'wld_device_dmc': wld_device_dmc,
+                'wld_phoenix_id': '',
+                'wld_latest': 'Y',
+                'wld_bin_code': bin_code,
+                'wld_bin_desc': bin_desc,
+                'wfi_facility': self.mir_info.get('facility', ''),
+                'wfi_operation': self.mir_info.get('operation', ''),
+                'wl_lot_name': self.mir_info.get('lot_name', ''),
+                'wmp_prog_name': self.mir_info.get('prog_name', ''),
+                'wmp_prog_version': self.mir_info.get('prog_version', ''),
+                'wfi_equipment': self.mir_info.get('equipment', ''),
+                'sft_name': 'STDF_CPP',
+                'sft_group': 'STDF_CPP',
+                'wld_created_date': current_time
+            }
+
+        return device_info_map
+
+    def _push_device_info(self, client, device_info_map):
+        """Push device_info records to ClickHouse"""
+        if not device_info_map:
+            return
+
+        print(f"🔧 Pushing {len(device_info_map)} device_info records...")
+        start_time = time.time()
+
+        # Convert dicts to tuples in correct column order
+        device_info_tuples = []
+        for device_record in device_info_map.values():
+            device_info_tuples.append((
+                device_record['wld_id'],
+                device_record['wld_device_dmc'],
+                device_record['wld_phoenix_id'],
+                device_record['wld_latest'],
+                device_record['wld_bin_code'],
+                device_record['wld_bin_desc'],
+                device_record['wfi_facility'],
+                device_record['wfi_operation'],
+                device_record['wl_lot_name'],
+                device_record['wmp_prog_name'],
+                device_record['wmp_prog_version'],
+                device_record['wfi_equipment'],
+                device_record['sft_name'],
+                device_record['sft_group'],
+                device_record['wld_created_date']
+            ))
+
+        # Push to ClickHouse
+        client.execute(
+            """INSERT INTO device_info (
+                wld_id, wld_device_dmc, wld_phoenix_id, wld_latest,
+                wld_bin_code, wld_bin_desc, wfi_facility, wfi_operation,
+                wl_lot_name, wmp_prog_name, wmp_prog_version, wfi_equipment,
+                sft_name, sft_group, wld_created_date
+            ) VALUES""",
+            device_info_tuples
+        )
+
+        elapsed = time.time() - start_time
+        print(f"✅ device_info push complete: {len(device_info_map)} records in {elapsed:.2f}s")
 
     def _load_existing_mappings(self, host, port, database, user, password):
         """Load existing device/parameter mappings from ClickHouse"""
@@ -147,18 +254,25 @@ class STDFProcessor:
             ch_host, ch_port, ch_database, ch_user, ch_password
         )
 
-        # Process with database-aware C++
+        # Process with database-aware C++ (with MIR fields in extra_fields)
+        print(f"🔍 Processing with MIR extraction...")
         result = stdf_parser_cpp.process_stdf_with_database_mappings(
             stdf_file_path,
             device_mappings,
             param_mappings,
-            self.current_file_hash or ""
+            self.current_file_hash or "",
+            extra_fields=[('MIR', ['FACIL_ID', 'OPER_NAM', 'LOT_ID', 'NODE_NAM', 'JOB_REV', 'SBLOT_ID'])]
         )
 
         # Extract results
         self.measurement_tuples = result.get('measurement_tuples', [])
         self.new_device_mappings = result.get('new_device_mappings', [])
         self.new_param_mappings = result.get('new_param_mappings', [])
+
+        # Extract MIR from first measurement's extra_fields (no duplicate parse!)
+        self.mir_info = self._extract_mir_from_measurements()
+        if self.mir_info:
+            print(f"✅ MIR extracted: {self.mir_info.get('lot_name', 'N/A')}")
 
         total_time = time.time() - start_time
 
@@ -206,7 +320,7 @@ class STDFProcessor:
                           settings={'max_insert_block_size': 1000000, 'max_threads': 16})
             setup_clickhouse_schema(client)
 
-            # Insert new mappings
+            # 1. Insert new mappings FIRST
             if self.new_device_mappings:
                 device_data = [(did, dmc) for dmc, did in self.new_device_mappings]
                 client.execute("INSERT INTO device_mapping (wld_id, wld_device_dmc) VALUES", device_data)
@@ -217,7 +331,12 @@ class STDFProcessor:
                 client.execute("INSERT INTO parameter_info (wtp_id, wtp_param_name) VALUES", param_data)
                 print(f"✅ Pushed {len(param_data)} new parameter mappings")
 
-            # Convert tuples to ClickHouse format
+            # 2. Push device_info (before measurements)
+            print(f"🔧 Collecting device_info...")
+            device_info_map = self._collect_device_info()
+            self._push_device_info(client, device_info_map)
+
+            # 3. Convert tuples to ClickHouse format
             current_time = datetime.now()
             clickhouse_tuples = [
                 (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, current_time,
@@ -226,7 +345,7 @@ class STDFProcessor:
                      segment, file_hash, *_) in self.measurement_tuples
             ]
 
-            # Push measurements
+            # 4. Push measurements
             print(f"🚀 Inserting {len(clickhouse_tuples):,} measurements...")
             client.execute(
                 "INSERT INTO measurements (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, "
@@ -271,6 +390,11 @@ class STDFProcessor:
         if 'clickhouse_push_time' in self.processing_stats:
             print(f"\nClickHouse:")
             print(f"  Push time: {self.processing_stats.get('clickhouse_push_time', 0):.2f}s")
+
+            # Calculate grand total (processing + ClickHouse)
+            grand_total = (self.processing_stats.get('total_processing_time', 0) +
+                          self.processing_stats.get('clickhouse_push_time', 0))
+            print(f"\nTotal Time (Processing + ClickHouse): {grand_total:.2f}s")
 
         print("=" * 60)
 
