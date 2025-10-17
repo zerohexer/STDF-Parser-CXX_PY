@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
 """
-TRUE Parallel STDF Processing with Perfect ID Alignment
-========================================================
+TRUE Parallel STDF Processing with ID Reassignment & device_info
+================================================================
 Uses ProcessPoolExecutor for REAL parallelism (not limited by GIL)
-Maintains perfect device/parameter ID alignment using database-aware C++ processing
+Maintains globally unique device/parameter IDs via Python-side reassignment
 
 Key Strategy:
 1. Load existing device/param mappings from database ONCE (main process)
 2. Pass mappings to each worker process
 3. Each worker calls C++ process_stdf_with_database_mappings() with:
-   - Existing mappings (for consistent IDs)
-   - Returns NEW mappings found in that file
-4. Main process collects ALL new mappings and inserts to database
-5. Mega-push all measurements in single operation
+   - Existing mappings (for consistent IDs within file)
+   - Returns NEW mappings found in that file (may have ID conflicts across workers)
+4. Main process REASSIGNS globally unique IDs to new mappings
+5. Remap measurement IDs to use reassigned IDs
+6. Push device_info (from MIR records) then measurements
 
 Benefits:
 - TRUE parallel processing (separate processes, no GIL)
-- Perfect ID alignment (C++ handles it with database-aware mode)
-- No race conditions (database handles ID conflicts)
-- Minimal overhead (only new mappings returned per file)
+- Globally unique IDs (Python reassignment ensures no conflicts)
+- Complete device_info support (facility, lot, bin codes, etc.)
+- IDs start from 1 (not 0)
+
+Fixed Issues:
+- Duplicate IDs from parallel workers (now reassigned)
+- IDs starting from 0 (now default=0 → first ID = 1)
+- Missing device_info records (now captures all batches)
+- Corrupted device_info data (now uses tuples, not dicts)
 """
 
 import os
@@ -66,6 +73,36 @@ def generate_file_hash(file_path):
     except Exception as e:
         print(f"⚠️ Error generating hash for {file_path}: {e}")
         return ""
+
+
+def extract_mir_from_stdf_fast(file_path):
+    """
+    Extract MIR (Master Information Record) for device_info metadata
+
+    Returns:
+        dict with facility, operation, lot_name, equipment, prog_name, prog_version
+    """
+    try:
+        result = stdf_parser_cpp.parse_stdf_file(file_path)
+        records = result.get('records', [])
+
+        for record in records:
+            if record.get('record_type') == 'MIR':
+                fields = record.get('fields', {})
+                return {
+                    'facility': fields.get('FACIL_ID', ''),
+                    'operation': fields.get('OPER_NAM', ''),
+                    'lot_name': fields.get('LOT_ID', ''),
+                    'equipment': fields.get('NODE_NAM', ''),
+                    'prog_name': fields.get('JOB_REV', ''),
+                    'prog_version': fields.get('SBLOT_ID', '')
+                }
+
+        return {}  # Empty if no MIR found
+
+    except Exception as e:
+        print(f"⚠️ MIR extraction error for {os.path.basename(file_path)}: {e}")
+        return {}
 
 
 def process_single_file_with_mappings(args):
@@ -129,6 +166,9 @@ def process_single_file_with_mappings(args):
 
         elapsed = time.time() - start_time
 
+        # Extract MIR info for device_info table
+        mir_info = extract_mir_from_stdf_fast(file_path)
+
         print(f"✅ {os.path.basename(file_path)}: {len(measurements):,} measurements in {elapsed:.2f}s")
         print(f"   📊 New devices: {len(new_device_mappings)}, New params: {len(new_param_mappings)}")
 
@@ -138,6 +178,8 @@ def process_single_file_with_mappings(args):
             'measurements': measurements,
             'new_device_mappings': new_device_mappings,
             'new_param_mappings': new_param_mappings,
+            'mir_info': mir_info,        # MIR data for device_info
+            'file_hash': file_hash,      # File hash for linking MIR to devices
             'total_measurements': len(measurements),
             'new_devices': len(new_device_mappings),
             'new_params': len(new_param_mappings),
@@ -186,20 +228,44 @@ def load_existing_mappings(client):
     return device_mappings, param_mappings
 
 
-def insert_new_mappings(client, all_new_devices, all_new_params):
-    """Insert all NEW mappings collected from workers"""
-    # Deduplicate across all files
+def insert_new_mappings(client, all_new_devices, all_new_params, existing_device_mappings, existing_param_mappings):
+    """
+    Insert all NEW mappings with globally unique ID reassignment
+
+    CRITICAL: Workers may generate conflicting IDs within a batch.
+    We MUST reassign IDs here to ensure global uniqueness.
+    """
+    # Get existing device/param names from database
+    existing_device_dmcs = set(dmc for dmc, _ in existing_device_mappings)
+    existing_param_names = set(name for name, _ in existing_param_mappings)
+
+    # Collect only TRULY NEW devices/params (not in database)
+    new_device_dmcs = set()
+    for device_dmc, _ in all_new_devices:  # Ignore worker IDs
+        if device_dmc not in existing_device_dmcs:
+            new_device_dmcs.add(device_dmc)
+
+    new_param_names = set()
+    for param_name, _ in all_new_params:  # Ignore worker IDs
+        if param_name not in existing_param_names:
+            new_param_names.add(param_name)
+
+    # Calculate max IDs from existing mappings (FIXED: default=0 instead of -1)
+    max_device_id = max([did for _, did in existing_device_mappings], default=0)
+    max_param_id = max([pid for _, pid in existing_param_mappings], default=0)
+
+    # REASSIGN globally unique IDs (sorted for determinism)
     unique_devices = {}
-    for device_dmc, device_id in all_new_devices:
-        if device_dmc not in unique_devices:
-            unique_devices[device_dmc] = device_id
+    for device_dmc in sorted(new_device_dmcs):
+        max_device_id += 1  # Now starts from 1 (not 0)
+        unique_devices[device_dmc] = max_device_id
 
     unique_params = {}
-    for param_name, param_id in all_new_params:
-        if param_name not in unique_params:
-            unique_params[param_name] = param_id
+    for param_name in sorted(new_param_names):
+        max_param_id += 1  # Now starts from 1 (not 0)
+        unique_params[param_name] = max_param_id
 
-    # Insert devices
+    # Insert devices with reassigned IDs
     if unique_devices:
         device_data = [(device_id, device_dmc) for device_dmc, device_id in unique_devices.items()]
         try:
@@ -207,11 +273,11 @@ def insert_new_mappings(client, all_new_devices, all_new_params):
                 "INSERT INTO device_mapping (wld_id, wld_device_dmc) VALUES",
                 device_data
             )
-            print(f"✅ Inserted {len(device_data)} new device mappings")
+            print(f"✅ Inserted {len(device_data)} new device mappings (IDs {min(d[0] for d in device_data)}-{max(d[0] for d in device_data)})")
         except Exception as e:
-            print(f"⚠️ Error inserting devices (may already exist): {e}")
+            print(f"⚠️ Error inserting devices: {e}")
 
-    # Insert parameters
+    # Insert parameters with reassigned IDs
     if unique_params:
         param_data = [(param_id, param_name) for param_name, param_id in unique_params.items()]
         try:
@@ -219,9 +285,45 @@ def insert_new_mappings(client, all_new_devices, all_new_params):
                 "INSERT INTO parameter_info (wtp_id, wtp_param_name) VALUES",
                 param_data
             )
-            print(f"✅ Inserted {len(param_data)} new parameter mappings")
+            print(f"✅ Inserted {len(param_data)} new parameter mappings (IDs {min(p[0] for p in param_data)}-{max(p[0] for p in param_data)})")
         except Exception as e:
-            print(f"⚠️ Error inserting params (may already exist): {e}")
+            print(f"⚠️ Error inserting params: {e}")
+
+    return unique_devices, unique_params
+
+
+def remap_measurement_ids(all_measurements, device_id_map, param_id_map):
+    """
+    Remap measurement IDs after reassignment
+
+    CRITICAL: Workers generate measurements with their own IDs.
+    After ID reassignment, we MUST update measurements to use the new IDs.
+
+    Args:
+        all_measurements: List of measurement tuples
+        device_id_map: Dict mapping device_dmc -> new_id
+        param_id_map: Dict mapping param_name -> new_id
+
+    Returns:
+        List of remapped measurement tuples
+    """
+    remapped = []
+    for tuple_data in all_measurements:
+        # Unpack 14-field tuple
+        (old_wld_id, old_wtp_id, wp_pos_x, wp_pos_y, wptm_value, test_flag, segment, file_hash,
+         wld_device_dmc, wtp_param_name, units, test_num, test_flg, extra_fields) = tuple_data
+
+        # Look up NEW IDs (use old ID if not found - means it was already in database)
+        new_wld_id = device_id_map.get(wld_device_dmc, old_wld_id)
+        new_wtp_id = param_id_map.get(wtp_param_name, old_wtp_id)
+
+        # Create remapped tuple
+        remapped.append((
+            new_wld_id, new_wtp_id, wp_pos_x, wp_pos_y, wptm_value, test_flag, segment, file_hash,
+            wld_device_dmc, wtp_param_name, units, test_num, test_flg, extra_fields
+        ))
+
+    return remapped
 
 
 def mega_push_measurements(client, all_measurements):
@@ -264,6 +366,107 @@ def mega_push_measurements(client, all_measurements):
 
     print(f"✅ MEGA-PUSH COMPLETE: {len(all_measurements):,} measurements in {elapsed:.2f}s")
     print(f"🚀 Throughput: {throughput:,.0f} measurements/second")
+
+
+def collect_device_info(all_measurements, mir_info_map):
+    """
+    Build device_info records from measurements + MIR data
+
+    Args:
+        all_measurements: List of measurement tuples
+        mir_info_map: Dict mapping file_hash -> MIR info
+
+    Returns:
+        dict mapping wld_id -> device_info record
+    """
+    device_info_map = {}
+
+    for tuple_data in all_measurements:
+        # Unpack 14-field tuple
+        (wld_id, wtp_id, wp_pos_x, wp_pos_y, wptm_value, test_flag, segment, file_hash,
+         wld_device_dmc, wtp_param_name, units, test_num, test_flg, extra_fields) = tuple_data
+
+        # Only create device_info once per wld_id
+        if wld_id not in device_info_map:
+            mir_info = mir_info_map.get(file_hash, {})
+
+            # Determine bin code/desc from test_flag
+            bin_code = '1' if test_flag == 1 else '0'
+            bin_desc = 'PASS' if test_flag == 1 else 'FAIL'
+
+            device_info_map[wld_id] = {
+                'wld_id': wld_id,
+                'wld_device_dmc': wld_device_dmc,
+                'wld_phoenix_id': '',
+                'wld_latest': 'Y',
+                'wld_bin_code': bin_code,
+                'wld_bin_desc': bin_desc,
+                'wfi_facility': mir_info.get('facility', ''),
+                'wfi_operation': mir_info.get('operation', ''),
+                'wl_lot_name': mir_info.get('lot_name', ''),
+                'wmp_prog_name': mir_info.get('prog_name', ''),
+                'wmp_prog_version': mir_info.get('prog_version', ''),
+                'wfi_equipment': mir_info.get('equipment', ''),
+                'sft_name': 'STDF_CPP',
+                'sft_group': 'STDF_CPP',
+                'wld_created_date': datetime.now()
+            }
+
+    return device_info_map
+
+
+def push_device_info(client, device_info_map, batch_size=10000):
+    """
+    Push device_info records to ClickHouse
+
+    Args:
+        client: ClickHouse client
+        device_info_map: Dict mapping wld_id -> device_info record
+        batch_size: Number of records per batch (for very large datasets)
+    """
+    if not device_info_map:
+        return
+
+    print(f"🔧 Pushing {len(device_info_map)} device_info records...")
+    start_time = time.time()
+
+    # Convert dicts to tuples in correct column order
+    device_info_tuples = []
+    for device_record in device_info_map.values():
+        device_info_tuples.append((
+            device_record['wld_id'],
+            device_record['wld_device_dmc'],
+            device_record['wld_phoenix_id'],
+            device_record['wld_latest'],
+            device_record['wld_bin_code'],
+            device_record['wld_bin_desc'],
+            device_record['wfi_facility'],
+            device_record['wfi_operation'],
+            device_record['wl_lot_name'],
+            device_record['wmp_prog_name'],
+            device_record['wmp_prog_version'],
+            device_record['wfi_equipment'],
+            device_record['sft_name'],
+            device_record['sft_group'],
+            device_record['wld_created_date']
+        ))
+
+    # Push in batches (usually just one batch)
+    for i in range(0, len(device_info_tuples), batch_size):
+        batch = device_info_tuples[i:i + batch_size]
+        if batch:
+            client.execute(
+                """INSERT INTO device_info (
+                    wld_id, wld_device_dmc, wld_phoenix_id, wld_latest,
+                    wld_bin_code, wld_bin_desc, wfi_facility, wfi_operation,
+                    wl_lot_name, wmp_prog_name, wmp_prog_version, wfi_equipment,
+                    sft_name, sft_group, wld_created_date
+                ) VALUES""",
+                batch
+            )
+
+    elapsed = time.time() - start_time
+    print(f"✅ device_info push complete: {len(device_info_map)} records in {elapsed:.2f}s")
 
 
 def main():
@@ -341,6 +544,7 @@ def main():
     all_measurements = []
     all_new_devices = []
     all_new_params = []
+    mir_info_map = {}  # Map file_hash -> MIR info (for device_info)
     processed_files = 0
     skipped_files = 0
     total_pushed_measurements = 0
@@ -389,6 +593,10 @@ def main():
                     all_new_devices.extend(result['new_device_mappings'])
                     all_new_params.extend(result['new_param_mappings'])
 
+                    # Collect MIR info for device_info
+                    if 'mir_info' in result and 'file_hash' in result:
+                        mir_info_map[result['file_hash']] = result['mir_info']
+
                     processed_files += 1
 
                 except Exception as e:
@@ -400,39 +608,50 @@ def main():
             print(f"\n📦 BATCH {batch_number} COMPLETE: Processed {len(current_batch_files)} files")
             print(f"🔒 WAITING: Pushing {len(all_measurements):,} measurements to ClickHouse...")
 
-            # Insert new mappings first
+            # Insert new mappings with ID reassignment
+            reassigned_devices = {}
+            reassigned_params = {}
             if args.push_clickhouse and client and (all_new_devices or all_new_params):
-                insert_new_mappings(client, all_new_devices, all_new_params)
+                # Reassign IDs and insert to database
+                reassigned_devices, reassigned_params = insert_new_mappings(
+                    client,
+                    all_new_devices,
+                    all_new_params,
+                    device_mappings,  # Existing mappings for reference
+                    param_mappings
+                )
 
-                # Extend with unique entries only (deduplicate before extending)
-                unique_new_devices = {}
-                for device_dmc, device_id in all_new_devices:
-                    if device_dmc not in unique_new_devices:
-                        unique_new_devices[device_dmc] = device_id
-
-                unique_new_params = {}
-                for param_name, param_id in all_new_params:
-                    if param_name not in unique_new_params:
-                        unique_new_params[param_name] = param_id
-
-                # Extend existing mappings with unique new entries
-                for device_dmc, device_id in unique_new_devices.items():
+                # Extend existing mappings with REASSIGNED IDs
+                for device_dmc, device_id in reassigned_devices.items():
                     device_mappings.append((device_dmc, device_id))
 
-                for param_name, param_id in unique_new_params.items():
+                for param_name, param_id in reassigned_params.items():
                     param_mappings.append((param_name, param_id))
 
-                print(f"✅ Extended mappings: +{len(unique_new_devices)} devices, +{len(unique_new_params)} params")
+                print(f"✅ Extended mappings: +{len(reassigned_devices)} devices, +{len(reassigned_params)} params")
                 print(f"📊 Total mappings now: {len(device_mappings)} devices, {len(param_mappings)} params")
 
                 all_new_devices = []
                 all_new_params = []
 
-            # Push measurements batch
+            # Push device_info and measurements batch
             if args.push_clickhouse and client and all_measurements:
+                # CRITICAL: Remap measurement IDs if we reassigned any
+                if reassigned_devices or reassigned_params:
+                    print(f"🔄 Remapping measurement IDs...")
+                    all_measurements = remap_measurement_ids(all_measurements, reassigned_devices, reassigned_params)
+
+                # 1. Push device_info FIRST (before measurements)
+                device_info_map = collect_device_info(all_measurements, mir_info_map)
+                push_device_info(client, device_info_map)
+
+                # 2. Then push measurements
                 mega_push_measurements(client, all_measurements)
                 total_pushed_measurements += len(all_measurements)
-                all_measurements = []  # Clear batch
+
+                # 3. Clear batch (now safe after pushing)
+                all_measurements = []
+                mir_info_map = {}  # Clear MIR info for next batch
 
             print(f"✅ Batch {batch_number} pushed successfully ({total_pushed_measurements:,} total)")
             print(f"➡️  Ready to process next batch...\n")
