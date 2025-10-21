@@ -351,14 +351,19 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product(
         
         std::string device_dmc = get_prr_field("PART_ID", get_prr_field("PART_TXT"));
         std::string bin_code = get_prr_field("SOFT_BIN", get_prr_field("HARD_BIN"));
-        
+
         // Parse coordinates with defaults
+        // Note: STDF uses -32768 as "unknown" marker - convert to 0
         int32_t default_x = 0, default_y = 0;
         try {
             std::string x_coord = get_prr_field("X_COORD", "0");
             std::string y_coord = get_prr_field("Y_COORD", "0");
             default_x = std::stoi(x_coord);
             default_y = std::stoi(y_coord);
+
+            // Convert STDF "unknown" marker (-32768) to 0
+            if (default_x == -32768) default_x = 0;
+            if (default_y == -32768) default_y = 0;
         } catch (...) {
             // Use defaults if parsing fails
         }
@@ -541,12 +546,17 @@ std::vector<MeasurementTuple> UltraFastProcessor::process_cross_product_measurem
         std::string bin_code = get_prr_field("SOFT_BIN", get_prr_field("HARD_BIN"));
 
         // Parse coordinates with defaults
+        // Note: STDF uses -32768 as "unknown" marker - convert to 0
         int32_t default_x = 0, default_y = 0;
         try {
             std::string x_coord = get_prr_field("X_COORD", "0");
             std::string y_coord = get_prr_field("Y_COORD", "0");
             default_x = std::stoi(x_coord);
             default_y = std::stoi(y_coord);
+
+            // Convert STDF "unknown" marker (-32768) to 0
+            if (default_x == -32768) default_x = 0;
+            if (default_y == -32768) default_y = 0;
         } catch (...) {
             // Use defaults if parsing fails
         }
