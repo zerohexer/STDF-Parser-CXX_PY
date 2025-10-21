@@ -79,27 +79,31 @@ class STDFProcessor:
             print(f"⚠️  Error checking file hash: {e}")
             return False
 
-    def _extract_mir_from_measurements(self):
-        """Extract MIR from first measurement's extra_fields (already parsed by C++)"""
-        if not self.measurement_tuples:
+    def _extract_mir_from_file(self, file_path):
+        """Extract MIR directly from STDF file using parse_stdf_file"""
+        try:
+            result = stdf_parser_cpp.parse_stdf_file(file_path)
+            records = result.get('records', [])
+
+            for record in records:
+                if record.get('record_type') == 'MIR':
+                    fields = record.get('fields', {})
+                    return {
+                        'facility': fields.get('FACIL_ID', ''),
+                        'operation': fields.get('OPER_NAM', ''),
+                        'lot_name': fields.get('LOT_ID', ''),
+                        'equipment': fields.get('NODE_NAM', ''),
+                        'prog_name': fields.get('JOB_REV', ''),
+                        'prog_version': fields.get('SBLOT_ID', '')
+                    }
+
+            print(f"⚠️  No MIR record found in file")
             return {}
 
-        # Get extra_fields from first measurement (field 13)
-        try:
-            first_measurement = self.measurement_tuples[0]
-            extra_fields = first_measurement[13]  # 14th field (index 13)
-
-            # Map MIR fields to device_info fields
-            return {
-                'facility': extra_fields.get('FACIL_ID', ''),
-                'operation': extra_fields.get('OPER_NAM', ''),
-                'lot_name': extra_fields.get('LOT_ID', ''),
-                'equipment': extra_fields.get('NODE_NAM', ''),
-                'prog_name': extra_fields.get('JOB_REV', ''),
-                'prog_version': extra_fields.get('SBLOT_ID', '')
-            }
         except Exception as e:
             print(f"⚠️  MIR extraction error: {e}")
+            import traceback
+            traceback.print_exc()
             return {}
 
     def _collect_device_info(self):
@@ -254,25 +258,25 @@ class STDFProcessor:
             ch_host, ch_port, ch_database, ch_user, ch_password
         )
 
-        # Process with database-aware C++ (with MIR fields in extra_fields)
-        print(f"🔍 Processing with MIR extraction...")
+        # Extract MIR info first (separate call for file-level metadata)
+        print(f"🔍 Extracting MIR info...")
+        self.mir_info = self._extract_mir_from_file(stdf_file_path)
+        if self.mir_info:
+            print(f"✅ MIR extracted: {self.mir_info.get('lot_name', 'N/A')}")
+
+        # Process with database-aware C++ (no extra_fields needed - MIR already extracted)
+        print(f"🔍 Processing measurements...")
         result = stdf_parser_cpp.process_stdf_with_database_mappings(
             stdf_file_path,
             device_mappings,
             param_mappings,
-            self.current_file_hash or "",
-            extra_fields=[('MIR', ['FACIL_ID', 'OPER_NAM', 'LOT_ID', 'NODE_NAM', 'JOB_REV', 'SBLOT_ID'])]
+            self.current_file_hash or ""
         )
 
         # Extract results
         self.measurement_tuples = result.get('measurement_tuples', [])
         self.new_device_mappings = result.get('new_device_mappings', [])
         self.new_param_mappings = result.get('new_param_mappings', [])
-
-        # Extract MIR from first measurement's extra_fields (no duplicate parse!)
-        self.mir_info = self._extract_mir_from_measurements()
-        if self.mir_info:
-            print(f"✅ MIR extracted: {self.mir_info.get('lot_name', 'N/A')}")
 
         total_time = time.time() - start_time
 
