@@ -50,16 +50,16 @@ static PyObject* stdf_record_to_dict(const STDFRecord& record) {
     return dict;
 }
 
-// Convert record type enum to string
+// Convert record type enum to string - Auto-generated from record_types.def
+// This ensures add_record_type.py doesn't need to modify this file
 static const char* record_type_to_string(STDFRecordType type) {
     switch (type) {
-        case STDFRecordType::PTR: return "PTR";
-        case STDFRecordType::MPR: return "MPR";
-        case STDFRecordType::FTR: return "FTR";
-        case STDFRecordType::HBR: return "HBR";
-        case STDFRecordType::SBR: return "SBR";
-        case STDFRecordType::PRR: return "PRR";
-        case STDFRecordType::MIR: return "MIR";
+        // X-Macro auto-generates case statements from registry
+        #define RECORD_TYPE(name, struct_type, typ, sub, macro) \
+            case STDFRecordType::name: return #name;
+        #include "../field_defs/record_types.def"
+        #undef RECORD_TYPE
+
         default: return "UNKNOWN";
     }
 }
@@ -707,14 +707,11 @@ PyMODINIT_FUNC PyInit_stdf_parser_cpp(void) {
         return nullptr;
     }
     
-    // Add constants for record types
-    PyModule_AddIntConstant(module, "PTR", static_cast<int>(STDFRecordType::PTR));
-    PyModule_AddIntConstant(module, "MPR", static_cast<int>(STDFRecordType::MPR));
-    PyModule_AddIntConstant(module, "FTR", static_cast<int>(STDFRecordType::FTR));
-    PyModule_AddIntConstant(module, "HBR", static_cast<int>(STDFRecordType::HBR));
-    PyModule_AddIntConstant(module, "SBR", static_cast<int>(STDFRecordType::SBR));
-    PyModule_AddIntConstant(module, "PRR", static_cast<int>(STDFRecordType::PRR));
-    PyModule_AddIntConstant(module, "MIR", static_cast<int>(STDFRecordType::MIR));
+    // Add constants for record types - Auto-generated from record_types.def
+    #define RECORD_TYPE(name, struct_type, typ, sub, macro) \
+        PyModule_AddIntConstant(module, #name, static_cast<int>(STDFRecordType::name));
+    #include "../field_defs/record_types.def"
+    #undef RECORD_TYPE
     
     return module;
 }
