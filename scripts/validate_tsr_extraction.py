@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 try:
     import stdf_parser_cpp
 except ImportError as e:
-    print(f"❌ ERROR: Could not import stdf_parser_cpp")
+    print(f"ERROR: Could not import stdf_parser_cpp")
     print(f"   {e}")
     print(f"   Make sure the C++ extension is built first:")
     print(f"   python setup_windows_mingw.py build_ext --inplace")
@@ -59,7 +59,7 @@ class Colors:
 def parse_stdf_file(stdf_file):
     """Parse STDF file and return results"""
     if not os.path.exists(stdf_file):
-        print(f"{Colors.RED}❌ ERROR: STDF file not found: {stdf_file}{Colors.RESET}")
+        print(f"{Colors.RED} ERROR: STDF file not found: {stdf_file}{Colors.RESET}")
         return None
 
     print(f"{Colors.CYAN}Parsing STDF file...{Colors.RESET}")
@@ -71,7 +71,7 @@ def parse_stdf_file(stdf_file):
         result = stdf_parser_cpp.parse_stdf_file(stdf_file)
         return result
     except Exception as e:
-        print(f"{Colors.RED}❌ ERROR: Failed to parse STDF file{Colors.RESET}")
+        print(f"{Colors.RED} ERROR: Failed to parse STDF file{Colors.RESET}")
         print(f"   {e}")
         return None
 
@@ -295,11 +295,11 @@ def main():
 
     # Final result
     if all_passed:
-        print(f"{Colors.GREEN}{Colors.BOLD}🎉 ALL VALIDATIONS PASSED!{Colors.RESET}")
+        print(f"{Colors.GREEN}{Colors.BOLD} ALL VALIDATIONS PASSED!{Colors.RESET}")
         print()
         return 0
     else:
-        print(f"{Colors.RED}{Colors.BOLD}❌ VALIDATION FAILED!{Colors.RESET}")
+        print(f"{Colors.RED}{Colors.BOLD} VALIDATION FAILED!{Colors.RESET}")
         print()
         return 1
 
@@ -312,7 +312,7 @@ if __name__ == '__main__':
         print(f"\n{Colors.YELLOW}Validation interrupted by user{Colors.RESET}")
         sys.exit(1)
     except Exception as e:
-        print(f"\n{Colors.RED}❌ UNEXPECTED ERROR:{Colors.RESET}")
+        print(f"\n{Colors.RED} UNEXPECTED ERROR:{Colors.RESET}")
         print(f"   {e}")
         import traceback
         traceback.print_exc()
