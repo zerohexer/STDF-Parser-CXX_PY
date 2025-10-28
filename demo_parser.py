@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-STDF Parser Demonstration
-Runs the C++ STDF parser and displays detailed results
+STDF Parser Demonstration - Dynamic Record Type & Field Detection
+Automatically detects all record types and extracts all fields without hardcoding
 """
 
 import stdf_parser_cpp
 import os
 import time
+from collections import defaultdict
 
 # Get the first STDF file
 stdf_file = 'STDF_Files/OSBE25_KEWGBBMD1U_BE_HRG39021_KEWGBBMD1U__Prod_TPP202_03_Agilent_93000MT9510_25C_5215_4_20241017193900.stdf'
 
 print('=' * 80)
-print('STDF PARSER DEMONSTRATION')
+print('STDF PARSER DEMONSTRATION - DYNAMIC MODE')
 print('=' * 80)
 print(f'File: {os.path.basename(stdf_file)}')
 print(f'File Size: {os.path.getsize(stdf_file) / (1024*1024):.2f} MB')
@@ -34,98 +35,170 @@ print(f'Parsing time: {parse_time:.2f} seconds')
 print(f'Throughput: {result["total_records"]/parse_time:,.0f} records/second')
 print()
 
-# Analyze record types
-record_types = {}
+# ============================================================================
+# DYNAMIC RECORD TYPE ANALYSIS
+# ============================================================================
+# Automatically organize records by type and collect field metadata
+record_types = defaultdict(list)
+record_type_fields = defaultdict(set)
+
 for record in result['records']:
     rtype = record.get('record_type', 'UNKNOWN')
-    record_types[rtype] = record_types.get(rtype, 0) + 1
+    record_types[rtype].append(record)
 
-print('Record Type Distribution:')
-for rtype, count in sorted(record_types.items(), key=lambda x: x[1], reverse=True):
+    # Collect all unique fields for this record type
+    fields = record.get('fields', {})
+    record_type_fields[rtype].update(fields.keys())
+
+# Sort record types by count (descending)
+sorted_types = sorted(record_types.items(), key=lambda x: len(x[1]), reverse=True)
+
+print('=' * 80)
+print('DYNAMIC RECORD TYPE DETECTION')
+print('=' * 80)
+print(f'Detected {len(record_types)} unique record type(s):\n')
+
+for rtype, records in sorted_types:
+    count = len(records)
     pct = (count / result["parsed_records"]) * 100
-    print(f'   {rtype:8s}: {count:6,} records ({pct:5.1f}%)')
+    field_count = len(record_type_fields[rtype])
+    print(f'   {rtype:12s}: {count:6,} records ({pct:5.1f}%) | {field_count:2d} fields extracted')
 
+# ============================================================================
+# SAMPLE DATA EXTRACTION - DYNAMIC (First 2-3 records per type)
+# ============================================================================
 print()
 print('=' * 80)
-print('SAMPLE DATA EXTRACTION')
+print('SAMPLE DATA EXTRACTION (All Record Types)')
 print('=' * 80)
 
-# Show PTR records
-ptr_records = [r for r in result['records'] if r.get('record_type') == 'PTR']
-print(f'\nPTR (Parametric Test) Records - Showing first 3 of {len(ptr_records):,}:')
-for i, record in enumerate(ptr_records[:3], 1):
-    fields = record.get('fields', {})
-    print(f'\n   Record #{i}:')
-    print(f'      TEST_NUM:  {fields.get("TEST_NUM", "N/A")}')
-    alarm_id = fields.get("ALARM_ID", "N/A")
-    if len(alarm_id) > 60:
-        print(f'      ALARM_ID:  {alarm_id[:60]}...')
-    else:
-        print(f'      ALARM_ID:  {alarm_id}')
-    print(f'      RESULT:    {fields.get("RESULT", "N/A")}')
-    print(f'      UNITS:     {fields.get("UNITS", "N/A")}')
-    print(f'      LO_LIMIT:  {fields.get("LO_LIMIT", "N/A")}')
-    print(f'      HI_LIMIT:  {fields.get("HI_LIMIT", "N/A")}')
-    print(f'      TEST_FLG:  {fields.get("TEST_FLG", "N/A")}')
+# Define record type descriptions
+RECORD_DESCRIPTIONS = {
+    'PTR': 'Parametric Test Record',
+    'MPR': 'Multiple-Result Parametric Record',
+    'FTR': 'Functional Test Record',
+    'PRR': 'Part Result Record',
+    'MIR': 'Master Information Record',
+    'HBR': 'Hardware Bin Record',
+    'SBR': 'Software Bin Record',
+    'TSR': 'Test Synopsis Record',
+    'WIR': 'Wafer Information Record',
+    'WRR': 'Wafer Results Record',
+    'UNKNOWN': 'Unknown/Unsupported Record Type'
+}
 
-# Show MPR records
-mpr_records = [r for r in result['records'] if r.get('record_type') == 'MPR']
-if mpr_records:
-    print(f'\nMPR (Multiple-Result Parametric) Records - Showing first 2 of {len(mpr_records):,}:')
-    for i, record in enumerate(mpr_records[:2], 1):
+# Key fields to highlight for each record type (if available)
+KEY_FIELDS = {
+    'PTR': ['TEST_NUM', 'HEAD_NUM', 'SITE_NUM', 'RESULT', 'UNITS', 'LO_LIMIT', 'HI_LIMIT', 'TEST_FLG', 'TEST_TXT'],
+    'MPR': ['TEST_NUM', 'HEAD_NUM', 'SITE_NUM', 'RSLT_CNT', 'UNITS', 'TEST_TXT'],
+    'FTR': ['TEST_NUM', 'HEAD_NUM', 'SITE_NUM', 'TEST_FLG', 'TEST_TXT'],
+    'PRR': ['HEAD_NUM', 'SITE_NUM', 'PART_ID', 'HARD_BIN', 'SOFT_BIN', 'X_COORD', 'Y_COORD', 'NUM_TEST'],
+    'MIR': ['SETUP_T', 'START_T', 'LOT_ID', 'PART_TYP', 'NODE_NAM', 'TSTR_TYP', 'JOB_NAM', 'EXEC_TYP'],
+    'HBR': ['HEAD_NUM', 'SITE_NUM', 'HBIN_NUM', 'HBIN_CNT', 'HBIN_NAM'],
+    'SBR': ['HEAD_NUM', 'SITE_NUM', 'SBIN_NUM', 'SBIN_CNT', 'SBIN_NAM'],
+    'TSR': ['HEAD_NUM', 'SITE_NUM', 'TEST_TYP', 'TEST_NUM', 'EXEC_CNT', 'FAIL_CNT', 'ALRM_CNT', 'TEST_NAM', 'TEST_MIN', 'TEST_MAX'],
+}
+
+# Display sample records for each detected type
+for rtype, records in sorted_types:
+    if not records:
+        continue
+
+    desc = RECORD_DESCRIPTIONS.get(rtype, f'{rtype} Record Type')
+    sample_count = min(3, len(records))
+
+    print(f'\n{rtype} ({desc})')
+    print(f'   Total: {len(records):,} records | Showing first {sample_count}:')
+
+    for i, record in enumerate(records[:sample_count], 1):
         fields = record.get('fields', {})
         print(f'\n   Record #{i}:')
-        print(f'      TEST_NUM:  {fields.get("TEST_NUM", "N/A")}')
-        alarm_id = fields.get("ALARM_ID", "N/A")
-        if len(alarm_id) > 60:
-            print(f'      ALARM_ID:  {alarm_id[:60]}...')
-        else:
-            print(f'      ALARM_ID:  {alarm_id}')
-        print(f'      RSLT_CNT:  {fields.get("RSLT_CNT", "N/A")} (number of measurements)')
-        print(f'      UNITS:     {fields.get("UNITS", "N/A")}')
 
-# Show PRR records
-prr_records = [r for r in result['records'] if r.get('record_type') == 'PRR']
-print(f'\nPRR (Part Result) Records - Showing first 3 of {len(prr_records):,}:')
-for i, record in enumerate(prr_records[:3], 1):
-    fields = record.get('fields', {})
-    print(f'\n   Record #{i}:')
-    print(f'      PART_ID:   {fields.get("PART_ID", "N/A")}')
-    print(f'      X_COORD:   {fields.get("X_COORD", "N/A")}')
-    print(f'      Y_COORD:   {fields.get("Y_COORD", "N/A")}')
-    print(f'      HARD_BIN:  {fields.get("HARD_BIN", "N/A")}')
-    print(f'      SOFT_BIN:  {fields.get("SOFT_BIN", "N/A")}')
-    print(f'      NUM_TEST:  {fields.get("NUM_TEST", "N/A")} tests executed')
+        # Show key fields if defined for this type
+        key_fields = KEY_FIELDS.get(rtype, sorted(fields.keys())[:8])
 
-# Show MIR record
-mir_records = [r for r in result['records'] if r.get('record_type') == 'MIR']
-if mir_records:
-    print(f'\nMIR (Master Information) Record - File metadata:')
-    fields = mir_records[0].get('fields', {})
-    print(f'      LOT_ID:      {fields.get("LOT_ID", "N/A")}')
-    print(f'      PART_TYP:    {fields.get("PART_TYP", "N/A")}')
-    print(f'      NODE_NAM:    {fields.get("NODE_NAM", "N/A")}')
-    print(f'      TSTR_TYP:    {fields.get("TSTR_TYP", "N/A")}')
-    print(f'      JOB_NAM:     {fields.get("JOB_NAM", "N/A")}')
-    print(f'      EXEC_TYP:    {fields.get("EXEC_TYP", "N/A")}')
-    print(f'      STAT_NUM:    {fields.get("STAT_NUM", "N/A")}')
+        for field_name in key_fields:
+            if field_name in fields:
+                value = fields[field_name]
+                # Truncate long values
+                if isinstance(value, str) and len(value) > 60:
+                    value = value[:60] + '...'
+                print(f'      {field_name:15s}: {value}')
 
+# ============================================================================
+# FIELD EXTRACTION VALIDATION - Shows ALL fields for each record type
+# ============================================================================
 print()
 print('=' * 80)
-print('FIELD EXTRACTION CAPABILITIES')
+print('FIELD EXTRACTION VALIDATION')
+print('=' * 80)
+print('All fields extracted per record type:\n')
+
+for rtype in sorted(record_types.keys()):
+    fields = sorted(record_type_fields[rtype])
+    print(f'{rtype} ({len(fields)} fields):')
+
+    # Get first record of this type to show sample values
+    sample_record = record_types[rtype][0]
+    sample_fields = sample_record.get('fields', {})
+
+    for i, field_name in enumerate(fields, 1):
+        value = sample_fields.get(field_name, 'N/A')
+        # Truncate long values
+        if isinstance(value, str) and len(value) > 40:
+            value = value[:40] + '...'
+        print(f'   {i:2d}. {field_name:20s} = {value}')
+    print()
+
+# ============================================================================
+# TSR RECORD VALIDATION (CI/CD Check)
+# ============================================================================
+print('=' * 80)
+print('TSR RECORD TYPE VALIDATION')
 print('=' * 80)
 
-# Show all available fields for PTR record
-if ptr_records:
-    print('\nAll fields extracted from PTR record:')
-    fields = ptr_records[0].get('fields', {})
-    field_names = sorted(fields.keys())
-    for i, field_name in enumerate(field_names, 1):
-        value = fields[field_name]
-        if len(str(value)) > 50:
-            value = str(value)[:50] + '...'
-        print(f'   {i:2d}. {field_name:15s} = {value}')
+if 'TSR' in record_types:
+    tsr_records = record_types['TSR']
+    tsr_fields = record_type_fields['TSR']
 
+    print(f'✅ TSR Record Type DETECTED')
+    print(f'   Records found: {len(tsr_records):,}')
+    print(f'   Fields extracted: {len(tsr_fields)}')
+    print(f'   Field list: {", ".join(sorted(tsr_fields))}')
+
+    # Expected TSR fields (from STDF specification)
+    expected_fields = {
+        'HEAD_NUM', 'SITE_NUM', 'TEST_TYP', 'TEST_NUM',
+        'EXEC_CNT', 'FAIL_CNT', 'ALRM_CNT', 'TEST_NAM',
+        'SEQ_NAME', 'TEST_LBL', 'OPT_FLAG', 'TEST_TIM',
+        'TEST_MIN', 'TEST_MAX', 'TST_SUMS', 'TST_SQRS'
+    }
+
+    found_fields = tsr_fields & expected_fields
+    missing_fields = expected_fields - tsr_fields
+
+    if found_fields:
+        print(f'\n   ✅ Found {len(found_fields)} expected TSR fields:')
+        print(f'      {", ".join(sorted(found_fields))}')
+
+    if missing_fields:
+        print(f'\n   ⚠️  Missing {len(missing_fields)} expected TSR fields:')
+        print(f'      {", ".join(sorted(missing_fields))}')
+
+    # Show sample TSR record
+    if tsr_records:
+        print(f'\n   Sample TSR Record:')
+        sample = tsr_records[0].get('fields', {})
+        for field in sorted(tsr_fields):
+            print(f'      {field:15s}: {sample.get(field, "N/A")}')
+else:
+    print('ℹ️  TSR Record Type NOT FOUND in this STDF file')
+    print('   This is normal if the test file does not contain TSR records.')
+    print('   TSR support is configured and will work when TSR records are present.')
+
+# ============================================================================
+# SUMMARY
+# ============================================================================
 print()
 print('=' * 80)
 print('PARSING COMPLETED SUCCESSFULLY!')
@@ -133,3 +206,6 @@ print('=' * 80)
 print(f'\nParser Version: {stdf_parser_cpp.get_version()}')
 print(f'Total Processing Time: {parse_time:.2f} seconds')
 print(f'Average Record Parse Time: {(parse_time / result["total_records"]) * 1000:.3f} ms per record')
+print(f'\nRecord Types Detected: {len(record_types)}')
+print(f'Total Fields Extracted: {sum(len(fields) for fields in record_type_fields.values())}')
+print(f'Unique Record Types: {", ".join(sorted(record_types.keys()))}')
