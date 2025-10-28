@@ -149,14 +149,14 @@ def print_validation_results(args, result, record_type_data, tsr_records, found_
     # TSR existence check
     print(f"{Colors.CYAN}TSR Record Check:{Colors.RESET}")
     if tsr_records:
-        print(f"  {Colors.GREEN}✓ PASSED{Colors.RESET} - TSR records found")
+        print(f"  {Colors.GREEN} PASSED{Colors.RESET} - TSR records found")
         print(f"    TSR record count: {len(tsr_records):,}")
 
         # Calculate percentage of total records
         pct = (len(tsr_records) / result['parsed_records']) * 100
         print(f"    Percentage of total: {pct:.1f}%")
     else:
-        print(f"  {Colors.RED}✗ FAILED{Colors.RESET} - TSR records NOT FOUND")
+        print(f"  {Colors.RED} FAILED{Colors.RESET} - TSR records NOT FOUND")
     print()
 
     # TSR field extraction check
@@ -177,10 +177,10 @@ def print_validation_results(args, result, record_type_data, tsr_records, found_
         print()
 
         if missing_fields:
-            print(f"  {Colors.RED}✗ FAILED{Colors.RESET} - Missing {len(missing_fields)} required fields")
+            print(f"  {Colors.RED} FAILED{Colors.RESET} - Missing {len(missing_fields)} required fields")
             print(f"    Missing: {', '.join(sorted(missing_fields))}")
         else:
-            print(f"  {Colors.GREEN}✓ PASSED{Colors.RESET} - All required fields present")
+            print(f"  {Colors.GREEN} PASSED{Colors.RESET} - All required fields present")
     print()
 
     # Sample TSR record (if verbose)
@@ -276,20 +276,20 @@ def main():
 
     # Check 1: TSR records exist
     if tsr_exists:
-        print(f"  {Colors.GREEN}✓ TSR records found:{Colors.RESET} {tsr_message}")
+        print(f"  {Colors.GREEN} TSR records found:{Colors.RESET} {tsr_message}")
     else:
-        print(f"  {Colors.RED}✗ TSR records check:{Colors.RESET} {tsr_message}")
+        print(f"  {Colors.RED} TSR records check:{Colors.RESET} {tsr_message}")
         all_passed = False
 
     # Check 2: Required fields present (if specified)
     if args.required_fields:
         if fields_valid:
-            print(f"  {Colors.GREEN}✓ Required fields:{Colors.RESET} {fields_message}")
+            print(f"  {Colors.GREEN} Required fields:{Colors.RESET} {fields_message}")
         else:
-            print(f"  {Colors.RED}✗ Required fields:{Colors.RESET} {fields_message}")
+            print(f"  {Colors.RED} Required fields:{Colors.RESET} {fields_message}")
             all_passed = False
     else:
-        print(f"  {Colors.YELLOW}⊙ Required fields:{Colors.RESET} Not specified (use --required-fields)")
+        print(f"  {Colors.YELLOW} Required fields:{Colors.RESET} Not specified (use --required-fields)")
 
     print()
 
