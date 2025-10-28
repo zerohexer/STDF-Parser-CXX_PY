@@ -7,9 +7,9 @@ build/
 *.dll
 *.dylib
 
-# Python extensions (keep working binaries)
-# *.pyd
-# *.so
+# Python extensions - ignore build artifacts
+*.pyd
+*.so
 
 # But exclude specific build artifacts
 build/**/*.pyd
