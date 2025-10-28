@@ -167,26 +167,17 @@ jobs:
           
           # Backup original
           Copy-Item $tsr_fields_file "$tsr_fields_file.backup"
-          Write-Host "✅ Created backup: $tsr_fields_file.backup" -ForegroundColor Green
-          
-          # Read current content
-          $content = Get-Content $tsr_fields_file -Raw
+          Write-Host "Created backup: $tsr_fields_file.backup" -ForegroundColor Green
           
           # Add new fields to TSR definition
-          $new_fields = @"
-
-// Modified in CI/CD pipeline - Additional test fields
-FIELD("TEST_TXT", TEST_TXT)
-FIELD("ALARM_ID", ALARM_ID)
-FIELD("OPT_FLAG", OPT_FLAG)
-FIELD("RES_SCAL", RES_SCAL)
-"@
+          "" | Add-Content $tsr_fields_file
+          "// Modified in CI/CD pipeline - Additional test fields" | Add-Content $tsr_fields_file
+          'FIELD("TEST_TXT", TEST_TXT)' | Add-Content $tsr_fields_file
+          'FIELD("ALARM_ID", ALARM_ID)' | Add-Content $tsr_fields_file
+          'FIELD("OPT_FLAG", OPT_FLAG)' | Add-Content $tsr_fields_file
+          'FIELD("RES_SCAL", RES_SCAL)' | Add-Content $tsr_fields_file
           
-          # Append new fields
-          $modified_content = $content + $new_fields
-          Set-Content $tsr_fields_file $modified_content
-          
-          Write-Host "`n✅ Modified TSR field definitions" -ForegroundColor Green
+          Write-Host "`nModified TSR field definitions" -ForegroundColor Green
           Write-Host "`nNew content preview:" -ForegroundColor Cyan
           Get-Content $tsr_fields_file | Select-Object -Last 10
         shell: pwsh
