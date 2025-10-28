@@ -10,11 +10,11 @@ import sys
 import platform
 import glob
 
-print("🔧 Setting up STDF Parser for Windows with MinGW...")
+print("Setting up STDF Parser for Windows with MinGW...")
 
 # Force MinGW compiler on Windows
 if platform.system() == "Windows":
-    print("🪟 Windows detected - forcing MinGW compiler...")
+    print("Windows detected - forcing MinGW compiler...")
     
     # Set environment to use MinGW
     os.environ['CC'] = 'gcc'
@@ -57,10 +57,10 @@ if platform.system() == "Windows":
         ],
     }
     
-    print("✅ Using MinGW compiler with Windows libstdf")
+    print("Using MinGW compiler with Windows libstdf")
     
 else:
-    print("❌ This script is designed for Windows only!")
+    print("This script is designed for Windows only!")
     sys.exit(1)
 
 # Create extension
@@ -74,4 +74,4 @@ setup(
     zip_safe=False,
 )
 
-print("🎉 Windows MinGW build complete!")
+print("Windows MinGW build complete!")
