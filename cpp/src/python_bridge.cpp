@@ -50,15 +50,16 @@ static PyObject* stdf_record_to_dict(const STDFRecord& record) {
     return dict;
 }
 
-// Convert record type enum to string - Auto-generated from record_types.def
+// Convert record type enum to string
 static const char* record_type_to_string(STDFRecordType type) {
     switch (type) {
-        // X-Macro auto-generates case statements from registry
-        #define RECORD_TYPE(name, struct_type, typ, sub, macro) \
-            case STDFRecordType::name: return #name;
-        #include "../field_defs/record_types.def"
-        #undef RECORD_TYPE
-
+        case STDFRecordType::PTR: return "PTR";
+        case STDFRecordType::MPR: return "MPR";
+        case STDFRecordType::FTR: return "FTR";
+        case STDFRecordType::HBR: return "HBR";
+        case STDFRecordType::SBR: return "SBR";
+        case STDFRecordType::PRR: return "PRR";
+        case STDFRecordType::MIR: return "MIR";
         default: return "UNKNOWN";
     }
 }
