@@ -13,16 +13,16 @@ jobs:
     runs-on: windows-latest
     
     steps:
-      - name: 🔍 Checkout Repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
         
-      - name: 🐍 Setup Python 3.11
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
       
-      - name: 🔧 Setup MSYS2 & MinGW
+      - name: Setup MSYS2 & MinGW
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
@@ -33,19 +33,19 @@ jobs:
             mingw-w64-x86_64-binutils
             make
       
-      - name: 🛠️ Add MinGW to PATH
+      - name: Add MinGW to PATH
         run: |
           echo "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         shell: pwsh
       
-      - name: ✅ Verify MinGW Installation
+      - name: Verify MinGW Installation
         run: |
           gcc --version
           g++ --version
         shell: bash
       
-      - name: 📦 Install Python Dependencies
+      - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
         shell: pwsh
@@ -53,7 +53,7 @@ jobs:
       # ===================================
       # PHASE 1: Add TSR Record Type
       # ===================================
-      - name: 📝 Phase 1 - Add TSR Record Type
+      - name: Phase 1 - Add TSR Record Type
         run: |
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 1: Adding TSR Record Type" -ForegroundColor Cyan
@@ -63,7 +63,7 @@ jobs:
           echo "y" | python scripts/add_record_type.py TSR rec_tsr 10 30
         shell: pwsh
       
-      - name: 🔍 Phase 1 - Verify TSR Files Created
+      - name: Phase 1 - Verify TSR Files Created
         run: |
           Write-Host "================================================" -ForegroundColor Yellow
           Write-Host "Verifying TSR Record Files" -ForegroundColor Yellow
@@ -103,7 +103,7 @@ jobs:
       # ===================================
       # PHASE 2: Build Extension
       # ===================================
-      - name: 🏗️ Phase 2 - Build C++ Extension (Initial)
+      - name: Phase 2 - Build C++ Extension (Initial)
         run: |
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 2: Building C++ Extension" -ForegroundColor Cyan
@@ -128,7 +128,7 @@ jobs:
       # ===================================
       # PHASE 3: Test TSR Record Extraction
       # ===================================
-      - name: 🧪 Phase 3 - Test TSR Record Extraction (Initial)
+      - name: Phase 3 - Test TSR Record Extraction (Initial)
         run: |
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 3: Testing TSR Record Extraction" -ForegroundColor Cyan
@@ -137,27 +137,35 @@ jobs:
           $stdfFile = "STDF_Files/OSBE25_KEWGBCLD1U_BE_HRG3301Y.06_KEWGBCLD1U__Prod_TPP202_03_Agilent_93000MT9510_25C_5264_2_20240903225947.stdf"
           
           if (!(Test-Path $stdfFile)) {
-              Write-Host "⚠️  Warning: Test STDF file not found: $stdfFile" -ForegroundColor Yellow
+              Write-Host "Warning: Test STDF file not found: $stdfFile" -ForegroundColor Yellow
               Write-Host "Skipping extraction test..." -ForegroundColor Yellow
               exit 0
           }
           
-          Write-Host "Running test_field_extraction.py for TSR records..." -ForegroundColor Cyan
-          python test_field_extraction.py --stdf-file "$stdfFile" --records-per-type 1
+          Write-Host "STDF file found: $stdfFile" -ForegroundColor Green
+          Write-Host "File size: $((Get-Item $stdfFile).Length / 1MB) MB" -ForegroundColor Cyan
+          Write-Host ""
+          Write-Host "Running field extraction test..." -ForegroundColor Cyan
+          Write-Host "Command: python test_field_extraction.py --stdf-file `"$stdfFile`" --records-per-type 1" -ForegroundColor Gray
+          Write-Host ""
           
+          # Run test and capture output
+          python test_field_extraction.py --stdf-file "$stdfFile" --records-per-type 1 2>&1 | Tee-Object -Variable testOutput
+          
+          Write-Host ""
           if ($LASTEXITCODE -eq 0) {
-              Write-Host "`n✅ TSR extraction test passed!" -ForegroundColor Green
+              Write-Host "TSR extraction test completed successfully!" -ForegroundColor Green
           } else {
-              Write-Host "`n⚠️  TSR extraction test completed with warnings" -ForegroundColor Yellow
-              Write-Host "This may be expected if TSR records don't exist in the test file" -ForegroundColor Yellow
+              Write-Host "TSR extraction test completed with exit code: $LASTEXITCODE" -ForegroundColor Yellow
+              Write-Host "Note: This may be expected if TSR records don't exist in the test file" -ForegroundColor Gray
           }
         shell: pwsh
-        continue-on-error: true  # Don't fail if TSR records aren't in the test file
+        continue-on-error: true
       
       # ===================================
       # PHASE 4: Modify TSR Fields
       # ===================================
-      - name: ✏️ Phase 4 - Modify TSR Field Definitions
+      - name: Phase 4 - Modify TSR Field Definitions
         run: |
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 4: Modifying TSR Field Definitions" -ForegroundColor Cyan
@@ -169,23 +177,33 @@ jobs:
           Copy-Item $tsr_fields_file "$tsr_fields_file.backup"
           Write-Host "Created backup: $tsr_fields_file.backup" -ForegroundColor Green
           
-          # Add new fields to TSR definition
+          # Add ACTUAL valid TSR fields from libstdf rec_tsr structure
           "" | Add-Content $tsr_fields_file
-          "// Modified in CI/CD pipeline - Additional test fields" | Add-Content $tsr_fields_file
-          'FIELD("TEST_TXT", TEST_TXT)' | Add-Content $tsr_fields_file
-          'FIELD("ALARM_ID", ALARM_ID)' | Add-Content $tsr_fields_file
+          "// Modified in CI/CD pipeline - Additional VALID TSR fields" | Add-Content $tsr_fields_file
+          'FIELD("TEST_TYP", TEST_TYP)' | Add-Content $tsr_fields_file
+          'FIELD("TEST_NUM", TEST_NUM)' | Add-Content $tsr_fields_file
+          'FIELD("EXEC_CNT", EXEC_CNT)' | Add-Content $tsr_fields_file
+          'FIELD("FAIL_CNT", FAIL_CNT)' | Add-Content $tsr_fields_file
+          'FIELD("ALRM_CNT", ALRM_CNT)' | Add-Content $tsr_fields_file
+          'FIELD("TEST_NAM", TEST_NAM)' | Add-Content $tsr_fields_file
+          'FIELD("SEQ_NAME", SEQ_NAME)' | Add-Content $tsr_fields_file
+          'FIELD("TEST_LBL", TEST_LBL)' | Add-Content $tsr_fields_file
           'FIELD("OPT_FLAG", OPT_FLAG)' | Add-Content $tsr_fields_file
-          'FIELD("RES_SCAL", RES_SCAL)' | Add-Content $tsr_fields_file
+          'FIELD("TEST_TIM", TEST_TIM)' | Add-Content $tsr_fields_file
+          'FIELD("TEST_MIN", TEST_MIN)' | Add-Content $tsr_fields_file
+          'FIELD("TEST_MAX", TEST_MAX)' | Add-Content $tsr_fields_file
+          'FIELD("TST_SUMS", TST_SUMS)' | Add-Content $tsr_fields_file
+          'FIELD("TST_SQRS", TST_SQRS)' | Add-Content $tsr_fields_file
           
-          Write-Host "`nModified TSR field definitions" -ForegroundColor Green
+          Write-Host "`nModified TSR field definitions with 15 valid fields" -ForegroundColor Green
           Write-Host "`nNew content preview:" -ForegroundColor Cyan
-          Get-Content $tsr_fields_file | Select-Object -Last 10
+          Get-Content $tsr_fields_file | Select-Object -Last 18
         shell: pwsh
       
       # ===================================
       # PHASE 5: Rebuild After Modification
       # ===================================
-      - name: 🏗️ Phase 5 - Rebuild C++ Extension (After Modification)
+      - name: Phase 5 - Rebuild C++ Extension (After Modification)
         run: |
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 5: Rebuilding After Field Modifications" -ForegroundColor Cyan
@@ -217,7 +235,7 @@ jobs:
       # ===================================
       # PHASE 6: Test After Modification
       # ===================================
-      - name: 🧪 Phase 6 - Test TSR Record Extraction (After Modification)
+      - name: Phase 6 - Test TSR Record Extraction (After Modification)
         run: |
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 6: Testing Modified TSR Fields" -ForegroundColor Cyan
@@ -226,19 +244,27 @@ jobs:
           $stdfFile = "STDF_Files/OSBE25_KEWGBCLD1U_BE_HRG3301Y.06_KEWGBCLD1U__Prod_TPP202_03_Agilent_93000MT9510_25C_5264_2_20240903225947.stdf"
           
           if (!(Test-Path $stdfFile)) {
-              Write-Host "⚠️  Warning: Test STDF file not found: $stdfFile" -ForegroundColor Yellow
+              Write-Host "Warning: Test STDF file not found: $stdfFile" -ForegroundColor Yellow
               Write-Host "Skipping extraction test..." -ForegroundColor Yellow
               exit 0
           }
           
-          Write-Host "Running test_field_extraction.py with modified TSR fields..." -ForegroundColor Cyan
-          python test_field_extraction.py --stdf-file "$stdfFile" --records-per-type 1
+          Write-Host "Testing with modified TSR field definitions..." -ForegroundColor Green
+          Write-Host "Expected: 15 TSR fields (TEST_TYP, TEST_NUM, EXEC_CNT, FAIL_CNT, ALRM_CNT, TEST_NAM, SEQ_NAME, TEST_LBL, OPT_FLAG, TEST_TIM, TEST_MIN, TEST_MAX, TST_SUMS, TST_SQRS)" -ForegroundColor Cyan
+          Write-Host ""
+          Write-Host "Running field extraction test..." -ForegroundColor Cyan
+          Write-Host "Command: python test_field_extraction.py --stdf-file `"$stdfFile`" --records-per-type 1" -ForegroundColor Gray
+          Write-Host ""
           
+          # Run test and capture output
+          python test_field_extraction.py --stdf-file "$stdfFile" --records-per-type 1 2>&1 | Tee-Object -Variable testOutput
+          
+          Write-Host ""
           if ($LASTEXITCODE -eq 0) {
-              Write-Host "`n✅ Modified TSR extraction test passed!" -ForegroundColor Green
+              Write-Host "Modified TSR extraction test completed successfully!" -ForegroundColor Green
           } else {
-              Write-Host "`n⚠️  Modified TSR extraction test completed with warnings" -ForegroundColor Yellow
-              Write-Host "This may be expected if TSR records don't exist in the test file" -ForegroundColor Yellow
+              Write-Host "Modified TSR extraction test completed with exit code: $LASTEXITCODE" -ForegroundColor Yellow
+              Write-Host "Note: This may be expected if TSR records don't exist in the test file" -ForegroundColor Gray
           }
         shell: pwsh
         continue-on-error: true
@@ -246,7 +272,7 @@ jobs:
       # ===================================
       # PHASE 7: Cleanup & Summary
       # ===================================
-      - name: 🧹 Phase 7 - Cleanup & Restore Original State
+      - name: Phase 7 - Cleanup & Restore Original State
         run: |
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 7: Cleanup & Summary" -ForegroundColor Cyan
@@ -277,7 +303,7 @@ jobs:
       # ===================================
       # Upload Artifacts
       # ===================================
-      - name: 📦 Upload Build Artifacts
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -288,7 +314,7 @@ jobs:
             cpp/field_defs/record_types.def
           retention-days: 5
       
-      - name: 📊 Upload Test Logs
+      - name: Upload Test Logs
         uses: actions/upload-artifact@v4
         if: always()
         with:
