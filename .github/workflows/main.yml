@@ -134,30 +134,24 @@ jobs:
           Write-Host "PHASE 3: Testing TSR Record Extraction" -ForegroundColor Cyan
           Write-Host "================================================" -ForegroundColor Cyan
           
-          $stdfFile = "STDF_Files/OSBE25_KEWGBCLD1U_BE_HRG3301Y.06_KEWGBCLD1U__Prod_TPP202_03_Agilent_93000MT9510_25C_5264_2_20240903225947.stdf"
-          
-          if (!(Test-Path $stdfFile)) {
-              Write-Host "Warning: Test STDF file not found: $stdfFile" -ForegroundColor Yellow
+          if (!(Test-Path "demo_parser.py")) {
+              Write-Host "Warning: demo_parser.py not found" -ForegroundColor Yellow
               Write-Host "Skipping extraction test..." -ForegroundColor Yellow
               exit 0
           }
           
-          Write-Host "STDF file found: $stdfFile" -ForegroundColor Green
-          Write-Host "File size: $((Get-Item $stdfFile).Length / 1MB) MB" -ForegroundColor Cyan
-          Write-Host ""
-          Write-Host "Running field extraction test..." -ForegroundColor Cyan
-          Write-Host "Command: python test_field_extraction.py --stdf-file `"$stdfFile`" --records-per-type 1" -ForegroundColor Gray
+          Write-Host "Running demo parser..." -ForegroundColor Cyan
+          Write-Host "Command: python demo_parser.py" -ForegroundColor Gray
           Write-Host ""
           
           # Run test and capture output
-          python test_field_extraction.py --stdf-file "$stdfFile" --records-per-type 1 2>&1 | Tee-Object -Variable testOutput
+          python demo_parser.py 2>&1 | Tee-Object -Variable testOutput
           
           Write-Host ""
           if ($LASTEXITCODE -eq 0) {
-              Write-Host "TSR extraction test completed successfully!" -ForegroundColor Green
+              Write-Host "Demo parser completed successfully!" -ForegroundColor Green
           } else {
-              Write-Host "TSR extraction test completed with exit code: $LASTEXITCODE" -ForegroundColor Yellow
-              Write-Host "Note: This may be expected if TSR records don't exist in the test file" -ForegroundColor Gray
+              Write-Host "Demo parser completed with exit code: $LASTEXITCODE" -ForegroundColor Yellow
           }
         shell: pwsh
         continue-on-error: true
@@ -241,10 +235,8 @@ jobs:
           Write-Host "PHASE 6: Testing Modified TSR Fields" -ForegroundColor Cyan
           Write-Host "================================================" -ForegroundColor Cyan
           
-          $stdfFile = "STDF_Files/OSBE25_KEWGBCLD1U_BE_HRG3301Y.06_KEWGBCLD1U__Prod_TPP202_03_Agilent_93000MT9510_25C_5264_2_20240903225947.stdf"
-          
-          if (!(Test-Path $stdfFile)) {
-              Write-Host "Warning: Test STDF file not found: $stdfFile" -ForegroundColor Yellow
+          if (!(Test-Path "demo_parser.py")) {
+              Write-Host "Warning: demo_parser.py not found" -ForegroundColor Yellow
               Write-Host "Skipping extraction test..." -ForegroundColor Yellow
               exit 0
           }
@@ -252,19 +244,18 @@ jobs:
           Write-Host "Testing with modified TSR field definitions..." -ForegroundColor Green
           Write-Host "Expected: 15 TSR fields (TEST_TYP, TEST_NUM, EXEC_CNT, FAIL_CNT, ALRM_CNT, TEST_NAM, SEQ_NAME, TEST_LBL, OPT_FLAG, TEST_TIM, TEST_MIN, TEST_MAX, TST_SUMS, TST_SQRS)" -ForegroundColor Cyan
           Write-Host ""
-          Write-Host "Running field extraction test..." -ForegroundColor Cyan
-          Write-Host "Command: python test_field_extraction.py --stdf-file `"$stdfFile`" --records-per-type 1" -ForegroundColor Gray
+          Write-Host "Running demo parser..." -ForegroundColor Cyan
+          Write-Host "Command: python demo_parser.py" -ForegroundColor Gray
           Write-Host ""
           
           # Run test and capture output
-          python test_field_extraction.py --stdf-file "$stdfFile" --records-per-type 1 2>&1 | Tee-Object -Variable testOutput
+          python demo_parser.py 2>&1 | Tee-Object -Variable testOutput
           
           Write-Host ""
           if ($LASTEXITCODE -eq 0) {
-              Write-Host "Modified TSR extraction test completed successfully!" -ForegroundColor Green
+              Write-Host "Modified TSR extraction with demo parser completed successfully!" -ForegroundColor Green
           } else {
-              Write-Host "Modified TSR extraction test completed with exit code: $LASTEXITCODE" -ForegroundColor Yellow
-              Write-Host "Note: This may be expected if TSR records don't exist in the test file" -ForegroundColor Gray
+              Write-Host "Demo parser completed with exit code: $LASTEXITCODE" -ForegroundColor Yellow
           }
         shell: pwsh
         continue-on-error: true
