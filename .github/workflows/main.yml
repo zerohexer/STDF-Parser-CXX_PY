@@ -133,20 +133,20 @@ jobs:
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 3: Testing TSR Record Extraction" -ForegroundColor Cyan
           Write-Host "================================================" -ForegroundColor Cyan
-          
+
           if (!(Test-Path "demo_parser.py")) {
               Write-Host "Warning: demo_parser.py not found" -ForegroundColor Yellow
               Write-Host "Skipping extraction test..." -ForegroundColor Yellow
               exit 0
           }
-          
+
           Write-Host "Running demo parser..." -ForegroundColor Cyan
           Write-Host "Command: python demo_parser.py" -ForegroundColor Gray
           Write-Host ""
-          
+
           # Run test and capture output
           python demo_parser.py 2>&1 | Tee-Object -Variable testOutput
-          
+
           Write-Host ""
           if ($LASTEXITCODE -eq 0) {
               Write-Host "Demo parser completed successfully!" -ForegroundColor Green
@@ -155,6 +155,29 @@ jobs:
           }
         shell: pwsh
         continue-on-error: true
+
+      - name: Phase 3 - Validate TSR Extraction (Initial)
+        run: |
+          Write-Host "================================================" -ForegroundColor Cyan
+          Write-Host "PHASE 3 VALIDATION: TSR Record Extraction" -ForegroundColor Cyan
+          Write-Host "================================================" -ForegroundColor Cyan
+
+          Write-Host "Validating TSR records exist and basic fields are extracted..." -ForegroundColor Yellow
+          Write-Host ""
+
+          # Run validation - expect TSR records to exist with basic fields
+          # Basic fields should include: HEAD_NUM, SITE_NUM, TEST_NUM, RECORD_TYPE
+          python scripts/validate_tsr_extraction.py --no-color --required-fields "HEAD_NUM,SITE_NUM,TEST_NUM,RECORD_TYPE" --min-records 1000
+
+          if ($LASTEXITCODE -eq 0) {
+              Write-Host ""
+              Write-Host "✅ Phase 3 Validation PASSED - TSR records found with basic fields" -ForegroundColor Green
+          } else {
+              Write-Host ""
+              Write-Host "❌ Phase 3 Validation FAILED - Check validation output above" -ForegroundColor Red
+              exit 1
+          }
+        shell: pwsh
       
       # ===================================
       # PHASE 4: Modify TSR Fields
@@ -234,23 +257,23 @@ jobs:
           Write-Host "================================================" -ForegroundColor Cyan
           Write-Host "PHASE 6: Testing Modified TSR Fields" -ForegroundColor Cyan
           Write-Host "================================================" -ForegroundColor Cyan
-          
+
           if (!(Test-Path "demo_parser.py")) {
               Write-Host "Warning: demo_parser.py not found" -ForegroundColor Yellow
               Write-Host "Skipping extraction test..." -ForegroundColor Yellow
               exit 0
           }
-          
+
           Write-Host "Testing with modified TSR field definitions..." -ForegroundColor Green
           Write-Host "Expected: 15 TSR fields (TEST_TYP, TEST_NUM, EXEC_CNT, FAIL_CNT, ALRM_CNT, TEST_NAM, SEQ_NAME, TEST_LBL, OPT_FLAG, TEST_TIM, TEST_MIN, TEST_MAX, TST_SUMS, TST_SQRS)" -ForegroundColor Cyan
           Write-Host ""
           Write-Host "Running demo parser..." -ForegroundColor Cyan
           Write-Host "Command: python demo_parser.py" -ForegroundColor Gray
           Write-Host ""
-          
+
           # Run test and capture output
           python demo_parser.py 2>&1 | Tee-Object -Variable testOutput
-          
+
           Write-Host ""
           if ($LASTEXITCODE -eq 0) {
               Write-Host "Modified TSR extraction with demo parser completed successfully!" -ForegroundColor Green
@@ -259,6 +282,35 @@ jobs:
           }
         shell: pwsh
         continue-on-error: true
+
+      - name: Phase 6 - Validate TSR Extraction (After Modification)
+        run: |
+          Write-Host "================================================" -ForegroundColor Cyan
+          Write-Host "PHASE 6 VALIDATION: Modified TSR Field Extraction" -ForegroundColor Cyan
+          Write-Host "================================================" -ForegroundColor Cyan
+
+          Write-Host "Validating TSR records with ALL modified fields..." -ForegroundColor Yellow
+          Write-Host ""
+
+          # Run validation - expect ALL 15 added fields to be present
+          # These are the fields added in Phase 4
+          $required_fields = "TEST_TYP,TEST_NUM,EXEC_CNT,FAIL_CNT,ALRM_CNT,TEST_NAM,SEQ_NAME,TEST_LBL,OPT_FLAG,TEST_TIM,TEST_MIN,TEST_MAX,TST_SUMS,TST_SQRS"
+
+          Write-Host "Required fields (15 total):" -ForegroundColor Cyan
+          Write-Host "  $required_fields" -ForegroundColor Gray
+          Write-Host ""
+
+          python scripts/validate_tsr_extraction.py --no-color --required-fields $required_fields --min-records 1000
+
+          if ($LASTEXITCODE -eq 0) {
+              Write-Host ""
+              Write-Host "✅ Phase 6 Validation PASSED - All 15 TSR fields extracted correctly" -ForegroundColor Green
+          } else {
+              Write-Host ""
+              Write-Host "❌ Phase 6 Validation FAILED - Check validation output above" -ForegroundColor Red
+              exit 1
+          }
+        shell: pwsh
       
       # ===================================
       # PHASE 7: Cleanup & Summary
@@ -284,11 +336,14 @@ jobs:
           Write-Host "✅ Phase 1: TSR record type added successfully" -ForegroundColor Green
           Write-Host "✅ Phase 2: Initial build completed" -ForegroundColor Green
           Write-Host "✅ Phase 3: Initial extraction test executed" -ForegroundColor Green
+          Write-Host "   ✓ Validation: TSR records exist with basic fields" -ForegroundColor Green
           Write-Host "✅ Phase 4: TSR fields modified" -ForegroundColor Green
           Write-Host "✅ Phase 5: Rebuild after modification completed" -ForegroundColor Green
           Write-Host "✅ Phase 6: Modified field extraction test executed" -ForegroundColor Green
+          Write-Host "   ✓ Validation: All 15 TSR fields extracted correctly" -ForegroundColor Green
           Write-Host "✅ Phase 7: Cleanup completed" -ForegroundColor Green
           Write-Host "`n🎉 All workflow phases completed successfully!" -ForegroundColor Green
+          Write-Host "`nValidation Script: scripts/validate_tsr_extraction.py" -ForegroundColor Cyan
         shell: pwsh
       
       # ===================================
