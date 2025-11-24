@@ -1,0 +1,200 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║              STDF WATCHDOG INGESTION - DIRECTORY STRUCTURE REFERENCE          ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ RECOMMENDED DIRECTORY HIERARCHY                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+/data/stdf-ingestion/
+│
+├─ incoming/                    ◄── WATCHDOG MONITORS HERE
+│  └─ {FACILITY}/               (Level 1: Testing site, e.g., "OSBE25", "OSBE26")
+│     └─ {LOT}/                 (Level 2: Production lot, e.g., "KEWGBCLD1U")
+│        └─ {PRODUCT}/          (Level 3: Device/Product, e.g., "BE_HRG3301Y.06")
+│           └─ {TEST_PROGRAM}/  (Level 4: Test program, e.g., "Prod_TPP202_03")
+│              └─ *.stdf        ◄── DROP FILES HERE
+│
+├─ processing/                  ◄── FILES BEING PROCESSED
+│  └─ {same hierarchy as incoming}
+│
+├─ processed/                   ◄── SUCCESSFULLY INGESTED
+│  └─ {FACILITY}/
+│     └─ {LOT}/
+│        └─ {PRODUCT}/
+│           └─ {TEST_PROGRAM}/
+│              └─ {YYYY}/       (Year, e.g., "2025")
+│                 └─ {MM}/      (Month, e.g., "11")
+│                    └─ {DD}/   (Day, e.g., "24")
+│                       └─ *.stdf
+│
+└─ failed/                      ◄── PROCESSING ERRORS
+   └─ {same hierarchy as incoming}
+      ├─ *.stdf                 (Failed file)
+      └─ *.error.log            (Error details)
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ PROCESSING FLOW                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+   USER ACTION                  WATCHDOG ACTION              RESULT
+   ═══════════                  ═══════════════              ══════
+
+1. Copy .stdf file
+   │
+   ├──► incoming/OSBE25/LOT001/PRODUCT/TEST_V1/file.stdf
+                                   │
+                                   │  Watchdog detects new file
+                                   ▼
+2.                          Wait for file stable
+                            (ensure complete write)
+                                   │
+                                   ▼
+3.                          Move to processing/
+                            processing/OSBE25/.../file.stdf
+                                   │
+                                   ▼
+4.                          Parse STDF file
+                            Extract measurements
+                                   │
+                                   ▼
+5.                          Push to ClickHouse
+                            Insert into 4 tables
+                                   │
+                                   ▼
+                            ┌──────┴──────┐
+                            │             │
+                        SUCCESS        FAILURE
+                            │             │
+                            ▼             ▼
+6.                  processed/         failed/
+                    .../2025/11/24/    .../file.stdf
+                    file.stdf          file.error.log
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ EXAMPLE FILE PATHS                                                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Example 1: Basic hierarchy
+──────────────────────────
+incoming/OSBE25/KEWGBCLD1U/BE_HRG3301Y.06/Prod_TPP202_03/test_data_20251124.stdf
+         └─────┘ └────────┘ └────────────┘ └────────────┘ └──────────────────┘
+         FACILITY   LOT        PRODUCT      TEST_PROGRAM        FILENAME
+
+After processing (success):
+processed/OSBE25/KEWGBCLD1U/BE_HRG3301Y.06/Prod_TPP202_03/2025/11/24/test_data_20251124.stdf
+                                                           └─────────┘
+                                                           DATE PARTITION
+
+After processing (failure):
+failed/OSBE25/KEWGBCLD1U/BE_HRG3301Y.06/Prod_TPP202_03/test_data_20251124.stdf
+failed/OSBE25/KEWGBCLD1U/BE_HRG3301Y.06/Prod_TPP202_03/test_data_20251124.error.log
+
+
+Example 2: Multiple facilities
+───────────────────────────────
+incoming/
+├── OSBE25/LOT001/PRODUCT_A/TEST_V1/file1.stdf
+├── OSBE25/LOT002/PRODUCT_A/TEST_V1/file2.stdf
+└── OSBE26/LOT001/PRODUCT_B/TEST_V2/file3.stdf
+
+
+Example 3: Same product, different test programs
+─────────────────────────────────────────────────
+incoming/OSBE25/LOT001/HRG3301Y/
+├── Final_Test/final.stdf
+├── Burn_In/burnin.stdf
+└── Package_Test/package.stdf
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ FIELD MAPPINGS TO DATABASE                                                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Directory Level          Database Field         Example Value
+───────────────          ──────────────         ─────────────
+FACILITY             →   wfi_facility           "OSBE25"
+LOT                  →   wl_lot_name            "KEWGBCLD1U"
+PRODUCT              →   (inferred)             "BE_HRG3301Y.06"
+TEST_PROGRAM         →   wmp_prog_name          "Prod_TPP202_03"
+
+Note: STDF file headers contain the authoritative metadata. Directory structure
+      is for organization only. Parser extracts all fields from STDF records.
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ CLICKHOUSE TABLES POPULATED                                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Table                 Key Fields                           Purpose
+─────                 ──────────                           ───────
+measurements          wld_id, wtp_id, coordinates, value   Core measurement data
+device_mapping        wld_id, wld_device_dmc               Device ID mapping
+parameter_info        wtp_id, wtp_param_name               Test parameter mapping
+device_info           wld_id + all context fields          Device metadata & context
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ QUICK COMMANDS                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Setup directories:
+  python3 setup_ingestion_dirs.py --facilities OSBE25 OSBE26
+
+Start watchdog:
+  python3 watchdog_ingestion.py
+
+Copy file for processing:
+  cp test.stdf /data/stdf-ingestion/incoming/OSBE25/LOT001/PRODUCT/TEST_V1/
+
+Monitor logs:
+  tail -f stdf_ingestion.log
+
+Check status:
+  find /data/stdf-ingestion/incoming -name "*.stdf" | wc -l     # Pending
+  find /data/stdf-ingestion/processing -name "*.stdf" | wc -l   # In progress
+  find /data/stdf-ingestion/processed -name "*.stdf" | wc -l    # Completed
+  find /data/stdf-ingestion/failed -name "*.stdf" | wc -l       # Failed
+
+View failed file errors:
+  cat /data/stdf-ingestion/failed/OSBE25/.../file.error.log
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ FLEXIBILITY & OPTIONS                                                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+✓ You DON'T need all 4 levels - use any depth that fits your workflow
+✓ Directory names are flexible - use your own conventions
+✓ Supports spaces and special characters in names
+✓ Recursive monitoring - automatically creates missing parent directories
+✓ File naming is up to you - only .stdf extension matters
+✓ STDF header metadata always takes precedence over directory names
+
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ TROUBLESHOOTING                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Files not processing?
+  → Check watchdog is running: ps aux | grep watchdog
+  → Check file permissions: ls -la /data/stdf-ingestion/incoming/
+  → Verify .stdf extension (case-insensitive)
+  → Review logs: tail -f stdf_ingestion.log
+
+ClickHouse errors?
+  → Test connection: clickhouse-client --query "SELECT 1"
+  → Check host/port in command arguments
+  → Verify tables exist: clickhouse-client --query "SHOW TABLES"
+
+Files stuck in processing?
+  → Check logs for errors
+  → Manually move back to incoming/ or to failed/
+  → Restart watchdog service
+
+
+═══════════════════════════════════════════════════════════════════════════════
+For detailed documentation, see: WATCHDOG_INGESTION_README.md
+═══════════════════════════════════════════════════════════════════════════════
