@@ -78,92 +78,34 @@ class NetworkFileStateTracker:
             raise
 
     def _ensure_tracking_table(self):
-        """Create processed_files tracking table if it doesn't exist"""
-        create_table_sql = """
-        CREATE TABLE IF NOT EXISTS processed_files (
-            file_hash String,
-            file_path String,
-            file_name String,
-            facility String,
-            lot String,
-            product String,
-            test_program String,
-            file_size_bytes UInt64,
-            file_modified_time DateTime,
-            processed_date DateTime,
-            status String,
-            error_message String
-        ) ENGINE = MergeTree()
-        ORDER BY (facility, processed_date)
-        """
-        self.client.execute(create_table_sql)
-        self.logger.info("Ensured processed_files tracking table exists")
+        """Verify measurements table exists (already has file_hash field)"""
+        try:
+            # Check if measurements table exists
+            self.client.execute("SELECT COUNT(*) FROM measurements LIMIT 1")
+            self.logger.info("Using existing measurements table for file_hash tracking")
+        except Exception as e:
+            self.logger.warning(f"Measurements table not found: {e}")
+            self.logger.info("Will be created when first file is processed")
 
     def _load_processed_hashes(self):
-        """Load all processed file hashes into memory"""
-        query = "SELECT file_hash FROM processed_files WHERE status = 'completed'"
-        result = self.client.execute(query)
-        self.processed_hashes = {row[0] for row in result}
-        self.logger.info(f"Loaded {len(self.processed_hashes)} processed file hashes")
+        """Load all processed file hashes into memory from measurements table"""
+        try:
+            query = "SELECT DISTINCT file_hash FROM measurements WHERE file_hash != ''"
+            result = self.client.execute(query)
+            self.processed_hashes = {row[0] for row in result if row[0]}
+            self.logger.info(f"Loaded {len(self.processed_hashes)} processed file hashes from measurements table")
+        except Exception as e:
+            self.logger.warning(f"Could not load processed hashes: {e}")
+            self.processed_hashes = set()
 
     def is_processed(self, file_hash: str) -> bool:
         """Check if file has been processed"""
         return file_hash in self.processed_hashes
 
-    def mark_completed(self, file_hash: str, file_path: Path, metadata: Dict):
-        """Mark file as successfully processed"""
-        try:
-            file_stat = file_path.stat()
-            insert_sql = """
-            INSERT INTO processed_files
-            (file_hash, file_path, file_name, facility, lot, product, test_program,
-             file_size_bytes, file_modified_time, processed_date, status, error_message)
-            VALUES
-            """
-            self.client.execute(insert_sql, [{
-                'file_hash': file_hash,
-                'file_path': str(file_path),
-                'file_name': file_path.name,
-                'facility': metadata.get('facility', 'UNKNOWN'),
-                'lot': metadata.get('lot', 'UNKNOWN'),
-                'product': metadata.get('product', 'UNKNOWN'),
-                'test_program': metadata.get('test_program', 'UNKNOWN'),
-                'file_size_bytes': file_stat.st_size,
-                'file_modified_time': datetime.fromtimestamp(file_stat.st_mtime),
-                'processed_date': datetime.now(),
-                'status': 'completed',
-                'error_message': ''
-            }])
-            self.processed_hashes.add(file_hash)
-        except Exception as e:
-            self.logger.error(f"Failed to mark file as completed: {e}")
-
-    def mark_failed(self, file_hash: str, file_path: Path, metadata: Dict, error: str):
-        """Mark file as failed processing"""
-        try:
-            file_stat = file_path.stat()
-            insert_sql = """
-            INSERT INTO processed_files
-            (file_hash, file_path, file_name, facility, lot, product, test_program,
-             file_size_bytes, file_modified_time, processed_date, status, error_message)
-            VALUES
-            """
-            self.client.execute(insert_sql, [{
-                'file_hash': file_hash,
-                'file_path': str(file_path),
-                'file_name': file_path.name,
-                'facility': metadata.get('facility', 'UNKNOWN'),
-                'lot': metadata.get('lot', 'UNKNOWN'),
-                'product': metadata.get('product', 'UNKNOWN'),
-                'test_program': metadata.get('test_program', 'UNKNOWN'),
-                'file_size_bytes': file_stat.st_size,
-                'file_modified_time': datetime.fromtimestamp(file_stat.st_mtime),
-                'processed_date': datetime.now(),
-                'status': 'failed',
-                'error_message': error[:1000]
-            }])
-        except Exception as e:
-            self.logger.error(f"Failed to mark file as failed: {e}")
+    def mark_completed(self, file_hash: str):
+        """Add file hash to processed set (already in measurements table from push_to_clickhouse)"""
+        self.processed_hashes.add(file_hash)
+        self.logger.debug(f"Marked hash as processed: {file_hash[:16]}...")
 
 
 class NetworkFolderConfig:
@@ -329,8 +271,9 @@ class NetworkSTDFFileHandler(FileSystemEventHandler):
             )
             self.logger.info(f"Successfully pushed {len(measurements_df)} records")
 
-            # Mark as completed in database
-            self.state_tracker.mark_completed(file_hash, network_file_path, metadata)
+            # Mark as completed (add to in-memory cache)
+            # Note: file_hash already in measurements table from push_to_clickhouse
+            self.state_tracker.mark_completed(file_hash)
             self.logger.info(f"Completed: {network_file_path}")
 
             # Clean up local copy
@@ -339,13 +282,7 @@ class NetworkSTDFFileHandler(FileSystemEventHandler):
 
         except Exception as e:
             self.logger.error(f"Error processing {network_file_path}: {e}", exc_info=True)
-
-            # Mark as failed in database
-            try:
-                file_hash = calculate_file_hash(str(network_file_path))
-                self.state_tracker.mark_failed(file_hash, network_file_path, metadata, str(e))
-            except:
-                pass
+            # Note: Failed files won't have hash in measurements table, so will retry next time
 
             # Save error log locally
             try:
