@@ -46,7 +46,7 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Import existing STDF processing modules
-from extract_all_measurements import extract_all_measurements
+from extract_all_measurements import MeasurementExtractor
 from clickhouse_utils import push_to_clickhouse
 
 try:
@@ -326,16 +326,17 @@ class STDFLotProcessor:
             shutil.copy2(str(file_path), str(local_file))
 
             # Parse STDF file
-            measurements_df = extract_all_measurements(str(local_file))
+            extractor = MeasurementExtractor()
+            measurements = extractor.extract_measurements(str(local_file))
 
-            if measurements_df.empty:
+            if not measurements:
                 raise ValueError("No measurements extracted from STDF file")
 
-            measurement_count = len(measurements_df)
+            measurement_count = len(measurements)
 
             # Push to ClickHouse
             push_to_clickhouse(
-                measurements_df,
+                extractor,
                 host=self.clickhouse_host,
                 port=self.clickhouse_port
             )
