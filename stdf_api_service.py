@@ -124,13 +124,21 @@ def calculate_file_hash(file_path: str) -> str:
 class STDFStateTracker:
     """Tracks processed files using existing measurements.file_hash field"""
 
-    def __init__(self, clickhouse_host: str = "localhost", clickhouse_port: int = 9000):
+    def __init__(self, clickhouse_host: str = "localhost", clickhouse_port: int = 9000,
+                 clickhouse_database: str = "default", clickhouse_user: str = "default",
+                 clickhouse_password: str = ""):
         self.logger = logging.getLogger(__name__)
         self.processed_hashes: Set[str] = set()
         self.client = None
 
         try:
-            self.client = ClickHouseClient(host=clickhouse_host, port=clickhouse_port)
+            self.client = ClickHouseClient(
+                host=clickhouse_host,
+                port=clickhouse_port,
+                database=clickhouse_database,
+                user=clickhouse_user,
+                password=clickhouse_password
+            )
             self._load_processed_hashes()
             self.logger.info("State tracker initialized")
         except Exception as e:
@@ -168,18 +176,27 @@ class STDFLotProcessor:
     """Core processor for STDF lot processing"""
 
     def __init__(self, network_path: str, local_work_dir: str,
-                 clickhouse_host: str, clickhouse_port: int):
+                 clickhouse_host: str, clickhouse_port: int,
+                 clickhouse_database: str = "default",
+                 clickhouse_user: str = "default",
+                 clickhouse_password: str = ""):
         self.network_path = Path(network_path)
         self.local_work_dir = Path(local_work_dir)
         self.clickhouse_host = clickhouse_host
         self.clickhouse_port = clickhouse_port
+        self.clickhouse_database = clickhouse_database
+        self.clickhouse_user = clickhouse_user
+        self.clickhouse_password = clickhouse_password
         self.logger = logging.getLogger(__name__)
 
         # Create local working directory
         self.local_work_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize state tracker
-        self.state_tracker = STDFStateTracker(clickhouse_host, clickhouse_port)
+        self.state_tracker = STDFStateTracker(
+            clickhouse_host, clickhouse_port,
+            clickhouse_database, clickhouse_user, clickhouse_password
+        )
 
     def build_lot_path(self, product_class: str, product_type: str,
                        equipment: str, operation: str, lot: str) -> Path:
@@ -338,7 +355,10 @@ class STDFLotProcessor:
             push_to_clickhouse(
                 extractor,
                 host=self.clickhouse_host,
-                port=self.clickhouse_port
+                port=self.clickhouse_port,
+                database=self.clickhouse_database,
+                user=self.clickhouse_user,
+                password=self.clickhouse_password
             )
 
             # Mark as completed
@@ -470,10 +490,14 @@ Examples:
   # Start API server
   python stdf_api_service.py --network-path //server/share/stdf --port 8000
 
-  # With custom ClickHouse
+  # With custom ClickHouse (with credentials)
   python stdf_api_service.py \\
       --network-path /mnt/network/stdf \\
-      --clickhouse-host 192.168.1.100 \\
+      --ch-host 10.96.38.217 \\
+      --ch-port 9000 \\
+      --ch-database iswc \\
+      --ch-user admin \\
+      --ch-password secret_pass123 \\
       --port 8000
 
   # Test with curl
@@ -494,10 +518,16 @@ Examples:
                        help='Network folder path (e.g., //server/share/stdf)')
     parser.add_argument('--local-work-dir', default='/tmp/stdf-api',
                        help='Local working directory (default: /tmp/stdf-api)')
-    parser.add_argument('--clickhouse-host', default='localhost',
+    parser.add_argument('--clickhouse-host', '--ch-host', default='localhost',
                        help='ClickHouse host (default: localhost)')
-    parser.add_argument('--clickhouse-port', type=int, default=9000,
+    parser.add_argument('--clickhouse-port', '--ch-port', type=int, default=9000,
                        help='ClickHouse port (default: 9000)')
+    parser.add_argument('--clickhouse-database', '--ch-database', default='default',
+                       help='ClickHouse database (default: default)')
+    parser.add_argument('--clickhouse-user', '--ch-user', default='default',
+                       help='ClickHouse user (default: default)')
+    parser.add_argument('--clickhouse-password', '--ch-password', default='',
+                       help='ClickHouse password (default: empty)')
     parser.add_argument('--port', type=int, default=8000,
                        help='API server port (default: 8000)')
     parser.add_argument('--host', default='0.0.0.0',
@@ -518,6 +548,8 @@ Examples:
     logger.info(f"Network Path:    {args.network_path}")
     logger.info(f"Local Work Dir:  {args.local_work_dir}")
     logger.info(f"ClickHouse:      {args.clickhouse_host}:{args.clickhouse_port}")
+    logger.info(f"  Database:      {args.clickhouse_database}")
+    logger.info(f"  User:          {args.clickhouse_user}")
     logger.info(f"API Endpoint:    http://{args.host}:{args.port}")
     logger.info("=" * 70)
 
@@ -532,7 +564,10 @@ Examples:
         network_path=args.network_path,
         local_work_dir=args.local_work_dir,
         clickhouse_host=args.clickhouse_host,
-        clickhouse_port=args.clickhouse_port
+        clickhouse_port=args.clickhouse_port,
+        clickhouse_database=args.clickhouse_database,
+        clickhouse_user=args.clickhouse_user,
+        clickhouse_password=args.clickhouse_password
     )
 
     # Start API server
