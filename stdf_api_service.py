@@ -46,8 +46,10 @@ from pydantic import BaseModel, Field
 import uvicorn
 
 # Import existing STDF processing modules
-from extract_all_measurements import MeasurementExtractor
-from clickhouse_utils import push_to_clickhouse
+# Use parallel processing for batch (lot) ingestion
+import sys
+import subprocess
+from pathlib import Path
 
 try:
     from clickhouse_driver import Client as ClickHouseClient
@@ -262,11 +264,11 @@ class STDFLotProcessor:
                 message="No STDF files found in lot directory"
             )
 
-        # Process each file
-        results = []
-        for file_path in stdf_files:
-            result = self._process_single_file(file_path)
-            results.append(result)
+        # Process files using batch processor
+        results = self._process_lot_batch(lot_path)
+
+        # Log results
+        for result in results:
             self.logger.info(f"    {result.filename}: {result.status} "
                            f"({result.measurements} measurements)")
 
@@ -313,83 +315,121 @@ class STDFLotProcessor:
 
         return response
 
-    def _process_single_file(self, file_path: Path) -> FileProcessingResult:
+    def _process_lot_batch(self, lot_path: Path) -> List[FileProcessingResult]:
         """
-        Process a single STDF file
+        Process all STDF files in a lot using parallel processing script
 
         Args:
-            file_path: Path to STDF file
+            lot_path: Path to lot directory
 
         Returns:
-            FileProcessingResult
+            List of FileProcessingResult
         """
-        local_file = None
+        # Find all STDF files that need processing
+        stdf_files = list(lot_path.glob("*.stdf"))
+        if not stdf_files:
+            return []
 
-        try:
-            # Calculate file hash
+        # Filter files already processed
+        files_to_process = []
+        skipped_files = []
+
+        for file_path in stdf_files:
             file_hash = calculate_file_hash(str(file_path))
-
-            # Check if already processed
             if self.state_tracker.is_processed(file_hash):
-                return FileProcessingResult(
+                skipped_files.append(FileProcessingResult(
                     filename=file_path.name,
                     status='skipped',
                     measurements=0
-                )
+                ))
+            else:
+                files_to_process.append(file_path)
 
-            # Copy to local for processing
-            local_file = self.local_work_dir / f"{file_path.stem}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}{file_path.suffix}"
-            import shutil
-            shutil.copy2(str(file_path), str(local_file))
+        # If all files already processed, return early
+        if not files_to_process:
+            return skipped_files
 
-            # Parse STDF file
-            extractor = MeasurementExtractor()
-            measurements = extractor.extract_measurements(str(local_file))
+        # Use parallel processing script for batch ingestion
+        self.logger.info(f"Processing {len(files_to_process)} new files using parallel processor...")
 
-            if not measurements:
-                raise ValueError("No measurements extracted from STDF file")
+        try:
+            # Build command to call parallel processing script
+            cmd = [
+                sys.executable,
+                "extract_all_measurements_plus_clickhouse_connect_parallel.py",
+                "--directory", str(lot_path),
+                "--push-clickhouse",
+                "--ch-host", self.clickhouse_host,
+                "--ch-port", str(self.clickhouse_port),
+                "--ch-database", self.clickhouse_database,
+                "--ch-user", self.clickhouse_user,
+                "--ch-password", self.clickhouse_password,
+                "--workers", "8",
+                "--push-batch-size", str(len(files_to_process))  # Process all in one batch
+            ]
 
-            measurement_count = len(measurements)
-
-            # Push to ClickHouse
-            push_to_clickhouse(
-                extractor,
-                host=self.clickhouse_host,
-                port=self.clickhouse_port,
-                database=self.clickhouse_database,
-                user=self.clickhouse_user,
-                password=self.clickhouse_password
+            # Run parallel processor
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=600  # 10 minute timeout
             )
 
-            # Mark as completed
-            self.state_tracker.mark_completed(file_hash)
+            # Parse output to estimate measurements
+            # The parallel script outputs: "✅ Pushed X total measurements"
+            measurements_total = 0
+            for line in result.stdout.split('\n'):
+                if 'Pushed' in line and 'total measurements' in line:
+                    try:
+                        measurements_total = int(line.split('Pushed')[1].split('total')[0].replace(',', '').strip())
+                    except:
+                        pass
 
-            # Cleanup local copy
-            if local_file and local_file.exists():
-                local_file.unlink()
+            if result.returncode == 0:
+                # Success - mark all files as processed
+                processed_results = []
+                measurements_per_file = measurements_total // len(files_to_process) if files_to_process else 0
 
-            return FileProcessingResult(
-                filename=file_path.name,
-                status='success',
-                measurements=measurement_count
-            )
+                for file_path in files_to_process:
+                    file_hash = calculate_file_hash(str(file_path))
+                    self.state_tracker.mark_completed(file_hash)
+                    processed_results.append(FileProcessingResult(
+                        filename=file_path.name,
+                        status='success',
+                        measurements=measurements_per_file
+                    ))
 
+                return skipped_files + processed_results
+            else:
+                # Failed - mark all as failed
+                self.logger.error(f"Parallel processing failed: {result.stderr}")
+                failed_results = []
+                for file_path in files_to_process:
+                    failed_results.append(FileProcessingResult(
+                        filename=file_path.name,
+                        status='failed',
+                        measurements=0,
+                        error=result.stderr[:200]
+                    ))
+                return skipped_files + failed_results
+
+        except subprocess.TimeoutExpired:
+            self.logger.error(f"Processing timeout after 600s")
+            return skipped_files + [FileProcessingResult(
+                filename=f.name,
+                status='failed',
+                measurements=0,
+                error="Processing timeout"
+            ) for f in files_to_process]
         except Exception as e:
-            self.logger.error(f"Error processing {file_path.name}: {e}", exc_info=True)
-
-            # Cleanup local copy
-            if local_file and local_file.exists():
-                try:
-                    local_file.unlink()
-                except:
-                    pass
-
-            return FileProcessingResult(
-                filename=file_path.name,
+            self.logger.error(f"Error in batch processing: {e}", exc_info=True)
+            return skipped_files + [FileProcessingResult(
+                filename=f.name,
                 status='failed',
                 measurements=0,
                 error=str(e)
-            )
+            ) for f in files_to_process]
 
 
 # =============================================================================
