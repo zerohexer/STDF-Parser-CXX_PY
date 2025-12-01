@@ -41,3 +41,7 @@ repomix*
 
 # STDF test files (optional - uncomment if you don't want to commit large test files)
 # STDF_Files/*.stdf
+
+# STDF nested directory structure (test data created by automated watcher)
+STDF_Files/PCBcast*/
+STDF_Files/*/
