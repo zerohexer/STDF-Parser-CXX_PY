@@ -594,9 +594,19 @@ Examples:
     logger.info("=" * 70)
 
     # Verify network path exists
-    if not Path(args.network_path).exists():
+    # Use os.path.exists for better UNC path support on Windows
+    try:
+        path_exists = os.path.exists(args.network_path) or Path(args.network_path).exists()
+    except Exception as e:
+        logger.warning(f"Could not verify path existence: {e}")
+        path_exists = True  # Continue anyway, will fail later if path is invalid
+
+    if not path_exists:
         logger.error(f"Network path does not exist: {args.network_path}")
+        logger.error(f"Please verify the path is accessible from this machine")
         sys.exit(1)
+    else:
+        logger.info(f"✓ Network path verified: {args.network_path}")
 
     # Initialize global processor
     global processor
